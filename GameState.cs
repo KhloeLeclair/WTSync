@@ -49,22 +49,12 @@ internal static class GameState {
 		if (!Service.ClientState.IsLoggedIn)
 			return [];
 
-		return [
-			new("Khloe Leclair", 18014498553727000),
-			new("Warrior Of'Light", 18014498555793715),
-			new("Warrior Of'Darkness", 18014498553726998),
-			new("Wuk Lamat", 18014498544207970),
-			new("John FinalFantasy", 18014498548988383)
-			];
-
 		return ReadCWParty() ?? ReadNormalParty();
 	}
 
 	internal static int GetPartyCount() {
 		if (!Service.ClientState.IsLoggedIn)
 			return 0;
-
-		return 5;
 
 		return ReadCWPartyCount() ?? ReadNormalPartyCount();
 	}
