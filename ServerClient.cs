@@ -1,0 +1,114 @@
+using System;
+using System.Collections.Generic;
+using System.Net.Http;
+using System.Net.Http.Json;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Threading.Tasks;
+
+using WTSync.Models;
+
+namespace WTSync;
+
+internal class ServerClient : IDisposable {
+
+	public static readonly JsonSerializerOptions JSON_OPTIONS = new() {
+		NumberHandling = JsonNumberHandling.WriteAsString | JsonNumberHandling.AllowReadingFromString,
+		AllowTrailingCommas = true,
+		PropertyNameCaseInsensitive = true,
+		PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+	};
+
+	private readonly Plugin Plugin;
+	private readonly HttpClient Client;
+
+	private readonly Dictionary<ulong, WTStatus?> PendingStatus = [];
+	private Task? UploadTask;
+
+	internal ServerClient(Plugin plugin) {
+		Plugin = plugin;
+		Client = new HttpClient();
+
+		Client.DefaultRequestHeaders.UserAgent.Add(new System.Net.Http.Headers.ProductInfoHeaderValue("WTSync", "1.0"));
+	}
+
+	public void Dispose() {
+		UploadTask?.Dispose();
+		UploadTask = null;
+
+		Client.Dispose();
+	}
+
+	public SyncSocketClient StartStatusFeed(IEnumerable<ulong> ids) {
+		return new SyncSocketClient(Plugin, ids);
+	}
+
+	public void PostUpdate(ulong id, WTStatus? status) {
+		lock (PendingStatus) {
+			PendingStatus[id] = status;
+		}
+
+		MaybeScheduleSubmission();
+	}
+
+	private void MaybeScheduleSubmission() {
+		int count;
+		lock (PendingStatus) {
+			count = PendingStatus.Count;
+		}
+
+		if (count > 0)
+			UploadTask ??= SubmitUpdates().ContinueWith(t => {
+				if (t.IsFaulted)
+					Service.Logger.Error($"Unexpected error submitting state to server: {t.Exception}");
+				UploadTask = null;
+				MaybeScheduleSubmission();
+			});
+	}
+
+	public async Task SubmitUpdates() {
+		// First, make sure to let some time pass in case the user does more things.
+		await Task.Delay(5000);
+
+		// Now, get the updates to send.
+		List<WTStatusAndId> entries = [];
+		lock (PendingStatus) {
+			foreach (var entry in PendingStatus) {
+				entries.Add(new() {
+					Id = entry.Key,
+					Status = entry.Value
+				});
+			}
+			PendingStatus.Clear();
+		}
+
+		foreach (var entry in entries) {
+			try {
+				Service.Logger.Debug($"Submitting update for {entry.Id} to server.");
+				var response = await Client.PostAsJsonAsync($"{Plugin.Config.ServerUrl}/submit", entry, JSON_OPTIONS);
+
+				if (!response.IsSuccessStatusCode) {
+					string state = await response.Content.ReadAsStringAsync();
+					Service.Logger.Error($"Error submitting state to server: {state}");
+
+					if (response.StatusCode == System.Net.HttpStatusCode.InternalServerError)
+						lock (PendingStatus) {
+							if (!PendingStatus.ContainsKey(entry.Id))
+								PendingStatus[entry.Id] = entry.Status;
+						}
+				}
+
+			} catch (Exception ex) {
+				Service.Logger.Error($"Error submitting state to server: {ex}");
+			}
+		}
+	}
+
+}
+
+internal record PartyResponse {
+	public bool Ok { get; set; }
+	public int Status { get; set; }
+	public string? Message { get; set; }
+	public WTStatusAndId[]? Results { get; set; }
+}

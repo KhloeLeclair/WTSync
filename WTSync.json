@@ -1,0 +1,19 @@
+{
+    "Author": "Khloe Leclair",
+    "Name": "WTSync",
+    "Punchline": "View a list of all the Wondrous Tails duties shared by your party.",
+    "Description": "WTSync keeps uses an external server to keep track of the duties in your Wondrous Tails book. When you're in a party, and other players in the party are also using WTSync, you can open a UI to see which duties everyone needs at once in one convenient list.",
+    "RepoUrl": "https://github.com/KhloeLeclair/WTSync",
+    "InternalName": "WTSync",
+    "ApplicableVersion": "any",
+    "Tags": [
+        "UI",
+        "wondrous tails"
+    ],
+    "ImageUrls": [
+        "https://raw.githubusercontent.com/KhloeLeclair/GearsetHelperPlugin/main/images/image1-cropped.png",
+        "https://raw.githubusercontent.com/KhloeLeclair/GearsetHelperPlugin/main/images/image2-cropped.png",
+        "https://raw.githubusercontent.com/KhloeLeclair/GearsetHelperPlugin/main/images/image3.png",
+        "https://raw.githubusercontent.com/KhloeLeclair/GearsetHelperPlugin/main/images/image4.png"
+    ]
+}

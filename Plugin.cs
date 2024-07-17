@@ -1,0 +1,311 @@
+// Ignore Spelling: Plugin
+
+using System.Collections.Generic;
+using System.Linq;
+
+using Dalamud;
+using Dalamud.Game.Addon.Lifecycle;
+using Dalamud.Game.Addon.Lifecycle.AddonArgTypes;
+using Dalamud.Game.Gui.Dtr;
+using Dalamud.Interface.Windowing;
+using Dalamud.Plugin;
+
+using FFXIVClientStructs.FFXIV.Client.Game;
+using FFXIVClientStructs.FFXIV.Client.Game.UI;
+using FFXIVClientStructs.FFXIV.Client.UI.Agent;
+using FFXIVClientStructs.FFXIV.Component.GUI;
+
+using WTSync.Models;
+using WTSync.UI;
+
+namespace WTSync;
+
+public sealed class Plugin : IDalamudPlugin {
+
+	internal static Plugin Instance { get; private set; } = null!;
+
+	internal Localization Localization { get; init; }
+
+	internal Configuration Config { get; private set; }
+
+	internal WindowSystem WindowSystem { get; } = new WindowSystem("WTSync");
+
+	internal MainWindow MainWindow { get; private set; }
+
+	internal SettingsWindow SettingsWindow { get; private set; }
+
+	internal FirstRunWindow? FirstRunWindow { get; set; }
+
+	internal ServerClient ServerClient { get; private set; }
+
+	internal IDtrBarEntry dtrEntry;
+
+	internal PartyMemberTracker PartyMemberTracker { get; private set; }
+
+	internal Dictionary<ulong, WTStatus?> PreviousStatus { get; init; } = [];
+
+	#region Life Cycle
+
+	public Plugin(IDalamudPluginInterface pluginInterface) {
+		Instance = this;
+		pluginInterface.Create<Service>();
+
+		Localization = new(pluginInterface.GetPluginLocDirectory());
+		Localization.SetupWithUiCulture();
+
+		Config = pluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
+
+		// Client Stuff
+		PartyMemberTracker = new();
+		ServerClient = new(this);
+
+		// UI
+		MainWindow = new(this);
+		WindowSystem.AddWindow(MainWindow);
+
+		SettingsWindow = new(this);
+		WindowSystem.AddWindow(SettingsWindow);
+
+		// Server Bar
+		dtrEntry = Service.DtrBar.Get("WTSync");
+		dtrEntry.Shown = false;
+		dtrEntry.OnClick = ToggleMain;
+
+		// Commands
+		Service.CommandManager.AddHandler("/wtsync", new Dalamud.Game.Command.CommandInfo(OnCommand) {
+			HelpMessage = Localization.Localize("cmd.help", "Open the main WTSync window.")
+		});
+
+		// Events
+		Service.ClientState.Login += OnLogin;
+		Service.ClientState.TerritoryChanged += OnTerritoryChanged;
+		Service.Interface.UiBuilder.Draw += OnDraw;
+		Service.Interface.UiBuilder.OpenConfigUi += OnOpenConfig;
+		Service.Interface.UiBuilder.OpenMainUi += OnOpenMain;
+
+		Service.AddonLifecycle.RegisterListener(AddonEvent.PostRefresh, "WeeklyBingo", OnRefreshBingo);
+
+		// Do we need to accept terms?
+		if (!Config.AcceptedTerms) {
+			FirstRunWindow = new(this);
+			WindowSystem.AddWindow(FirstRunWindow);
+			FirstRunWindow.IsOpen = true;
+
+		} else {
+			// Update the state and open the window now.
+			MainWindow.MaybeOpenAtLoad();
+			if (Service.ClientState.IsLoggedIn)
+				SendServerUpdate();
+		}
+	}
+
+	public void OnCommand(string command, string arguments) {
+		if ("settings".Equals(arguments, System.StringComparison.OrdinalIgnoreCase) ||
+			"setting".Equals(arguments, System.StringComparison.OrdinalIgnoreCase)
+		)
+			OnOpenConfig();
+		else
+			OnOpenMain();
+	}
+
+	public void Dispose() {
+		// UI Cleanup
+		WindowSystem.RemoveAllWindows();
+
+		MainWindow.Dispose();
+
+		FirstRunWindow = null;
+
+		dtrEntry.Remove();
+
+		// Commands
+		Service.CommandManager.RemoveHandler("/wtsync");
+
+		// Client Cleanup
+		ServerClient.Dispose();
+
+		// Event Cleanup
+		Service.ClientState.Login -= OnLogin;
+		Service.ClientState.TerritoryChanged -= OnTerritoryChanged;
+		Service.Interface.UiBuilder.Draw -= OnDraw;
+		Service.Interface.UiBuilder.OpenConfigUi -= OnOpenConfig;
+		Service.Interface.UiBuilder.OpenMainUi -= OnOpenMain;
+
+		Service.AddonLifecycle.UnregisterListener(AddonEvent.PostRefresh, "WeeklyBingo", OnRefreshBingo);
+
+		PartyMemberTracker.Dispose();
+	}
+
+	public void CloseFirstRunWindow() {
+		if (FirstRunWindow != null) {
+			WindowSystem.RemoveWindow(FirstRunWindow);
+			FirstRunWindow = null;
+		}
+
+		if (Config.AcceptedTerms) {
+			MainWindow.MaybeOpenAtLoad();
+			if (Service.ClientState.IsLoggedIn)
+				SendServerUpdate();
+		}
+	}
+
+	#endregion
+
+	#region Server Communication
+
+	public void SendServerUpdate() {
+		if (!Service.ClientState.IsLoggedIn)
+			return;
+
+		if (!Config.AcceptedTerms)
+			return;
+
+		var result = new WTStatusAndId() {
+			Id = Service.ClientState.LocalContentId,
+			Status = GameState.ReadStatus()
+		};
+
+		// Check to see if this changed.
+		bool do_update = !PreviousStatus.TryGetValue(result.Id, out var previous) ||
+			!EqualityComparer<WTStatus>.Default.Equals(previous, result.Status);
+
+		// Server Update
+		if (do_update) {
+			PreviousStatus[result.Id] = result.Status;
+			Service.Logger.Debug($"Data changed, or was not already sent this session. Sending.");
+			ServerClient.PostUpdate(result.Id, result.Status);
+		}
+
+		// And finally, make sure the UI is up to date.
+		if (result.Status is null)
+			dtrEntry.Shown = false;
+		else {
+			int claimable = 0;
+			foreach (var duty in result.Status.Duties) {
+				if (duty.Status == PlayerState.WeeklyBingoTaskStatus.Claimable)
+					claimable++;
+			}
+
+			dtrEntry.Tooltip = Localization.Localize("gui.server-bar.tooltip", "Wondrous Tails Completion");
+			dtrEntry.Text = Localization.Localize("gui.server-bar.info", "WT: {stickers} / 9  {points}")
+				.Replace("{stickers}", (result.Status.Stickers + claimable).ToString())
+				.Replace("{points}", result.Status.SecondChancePoints.ToInstanceNumber());
+			dtrEntry.Shown = true;
+		}
+	}
+
+	public (SyncSocketClient?, PartyBingoState)? GetPartyDutyFeed() {
+		if (!Service.ClientState.IsLoggedIn)
+			return null;
+
+		var members = PartyMemberTracker.Members;
+		var client = members.Count == 1 ? null : ServerClient.StartStatusFeed(members.Select(x => x.Id));
+
+		Dictionary<ulong, WTStatus> statuses = [];
+		statuses[Service.ClientState.LocalContentId] = GameState.ReadStatus()!;
+
+		return (client, new(members, statuses));
+	}
+
+	#endregion
+
+	#region Events
+
+	private void OnRefreshBingo(AddonEvent type, AddonArgs args) {
+		SendServerUpdate();
+	}
+
+	private void OnLogin() {
+		SendServerUpdate();
+	}
+
+	private void OnTerritoryChanged(ushort territoryId) {
+		SendServerUpdate();
+	}
+
+	public void OnDraw() {
+		WindowSystem.Draw();
+	}
+
+	public void ToggleMain() {
+		if (MainWindow.IsOpen) {
+			if (!Config.OpenWithWT || !CloseWT())
+				MainWindow.IsOpen = false;
+		} else
+			OnOpenMain();
+	}
+
+	/// <summary>
+	/// If the Wondrous Tails menu is open, close it. Return whether or not we closed it.
+	/// </summary>
+	public unsafe bool CloseWT() {
+		var addon = (AtkUnitBase*) Service.GameGui.GetAddonByName("WeeklyBingo", 1);
+		if (addon is null || !addon->IsVisible)
+			return false;
+
+		addon->Close(true);
+		return true;
+	}
+
+	/// <summary>
+	/// Check if the Wondrous Tails menu is open, or if it can be opened. Attempt to open it.
+	/// Return whether or not it is open (or we tried to open it).
+	/// </summary>
+	public unsafe bool OpenWT() {
+		var addon = (AtkUnitBase*) Service.GameGui.GetAddonByName("WeeklyBingo", 1);
+		if (addon is not null && addon->IsVisible)
+			return true;
+
+		// First, check if we actually have the item to use.
+		var inv = InventoryManager.Instance();
+		if (inv is null || inv->GetInventoryItemCount(2002023) < 1)
+			return false;
+
+		// Then use it.
+		var inst = AgentInventoryContext.Instance();
+		if (inst is null)
+			return false;
+
+		inst->UseItem(2002023);
+		return true;
+	}
+
+	/// <summary>
+	/// This method checks to see if the user hasn't accepted our terms yet. If
+	/// they haven't, then we show them the first run window again and return
+	/// true so that whatever method calls this knows it shouldn't display
+	/// other UI elements to the user.
+	/// </summary>
+	public bool MaybeOpenFirstRunInstead() {
+		if (Config.AcceptedTerms)
+			return false;
+
+		if (FirstRunWindow == null) {
+			FirstRunWindow = new(this);
+			WindowSystem.AddWindow(FirstRunWindow);
+		}
+
+		FirstRunWindow.IsOpen = true;
+		FirstRunWindow.BringToFront();
+
+		return true;
+	}
+
+	public void OnOpenMain() {
+		if (MaybeOpenFirstRunInstead())
+			return;
+
+		if (!Config.OpenWithWT || !OpenWT())
+			MainWindow.IsOpen = true;
+	}
+
+	public void OnOpenConfig() {
+		if (MaybeOpenFirstRunInstead())
+			return;
+
+		SettingsWindow.OpenSettings();
+	}
+
+	#endregion
+
+}
