@@ -154,7 +154,7 @@ public class PartyBingoState {
 			if (row == null)
 				continue;
 
-			var thing = new BingoEntry(entry.Key, row, entry.Value, PlayerNames);
+			var thing = new BingoEntry(entry.Key, row, entry.Value, PlayerNames, Stickers);
 			Entries.Add(thing);
 
 			foreach (var type in thing.ContentTypes)
@@ -175,8 +175,9 @@ public class PartyBingoState {
 
 	[MemberNotNull(nameof(_CachedDisplayEntries))]
 	private void UpdateDisplayEntries() {
-
+#if DEBUG
 		Service.Logger.Debug($"Filtering and sorting entries.");
+#endif
 
 		int typesToggled = 0;
 		foreach (bool entry in _TypeFilters.Values) {
@@ -247,9 +248,11 @@ public class PartyBingoState {
 			if (aPlayers != bPlayers)
 				return bPlayers.CompareTo(aPlayers);
 
-			// Next, sort by minimum level (ascending)
-			if (a.MinLevel != b.MinLevel)
-				return a.MinLevel.CompareTo(b.MinLevel);
+			// Next, sort by minimum level (ascending) if there were players.
+			if (aPlayers > 0) {
+				if (a.MinLevel != b.MinLevel)
+					return a.MinLevel.CompareTo(b.MinLevel);
+			}
 
 			// Third, sort by total number of players (descending)
 			aPlayers += a.PlayersClaimable.Count + a.PlayersClaimed.Count;
@@ -257,6 +260,10 @@ public class PartyBingoState {
 
 			if (aPlayers != bPlayers)
 				return bPlayers.CompareTo(aPlayers);
+
+			// Next, sort by minimum level (ascending) without a player check
+			if (a.MinLevel != b.MinLevel)
+				return a.MinLevel.CompareTo(b.MinLevel);
 
 			// Finally, sort by name (ascending)
 			return a.DisplayName.CompareTo(b.DisplayName);

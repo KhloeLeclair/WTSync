@@ -15,6 +15,8 @@ using FFXIVClientStructs.FFXIV.Client.Game.UI;
 using FFXIVClientStructs.FFXIV.Client.UI.Agent;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 
+using Lumina.Excel.GeneratedSheets2;
+
 using WTSync.Models;
 using WTSync.UI;
 
@@ -177,21 +179,7 @@ public sealed class Plugin : IDalamudPlugin {
 		}
 
 		// And finally, make sure the UI is up to date.
-		if (result.Status is null)
-			dtrEntry.Shown = false;
-		else {
-			int claimable = 0;
-			foreach (var duty in result.Status.Duties) {
-				if (duty.Status == PlayerState.WeeklyBingoTaskStatus.Claimable)
-					claimable++;
-			}
-
-			dtrEntry.Tooltip = Localization.Localize("gui.server-bar.tooltip", "Wondrous Tails Completion");
-			dtrEntry.Text = Localization.Localize("gui.server-bar.info", "WT: {stickers} / 9  {points}")
-				.Replace("{stickers}", (result.Status.Stickers + claimable).ToString())
-				.Replace("{points}", result.Status.SecondChancePoints.ToInstanceNumber());
-			dtrEntry.Shown = true;
-		}
+		UpdateBarStatus(result.Status);
 	}
 
 	public (SyncSocketClient?, PartyBingoState)? GetPartyDutyFeed() {
@@ -206,6 +194,53 @@ public sealed class Plugin : IDalamudPlugin {
 
 		return (client, new(members, statuses));
 	}
+
+	#endregion
+
+	#region Server Bar
+
+	private WTStatus? BarStatus;
+
+	internal void UpdateBarStatus(WTStatus? status) {
+		BarStatus = status;
+		UpdateBar();
+	}
+
+	internal void UpdateBar() {
+		if (BarStatus is null)
+			dtrEntry.Shown = false;
+		else {
+			WeeklyBingoOrderData? matchingDuty = GameState.IsInDuty
+				? Helpers.GetMatchingEntry(BarStatus)
+				: null;
+
+			int claimable = 0;
+			foreach (var duty in BarStatus.Duties) {
+				if (duty.Status == PlayerState.WeeklyBingoTaskStatus.Claimable)
+					claimable++;
+			}
+
+			dtrEntry.Tooltip = Localization.Localize("gui.server-bar.tooltip", "Wondrous Tails Completion");
+			dtrEntry.Text = Localization.Localize("gui.server-bar.info", "WT: {stickers} / 9  {points}")
+				.Replace("{stickers}", (BarStatus.Stickers + claimable).ToString())
+				.Replace("{points}", BarStatus.SecondChancePoints.ToInstanceNumber());
+
+			if (matchingDuty != null) {
+				string extraTip;
+				if (matchingDuty.Text.Row == 0 || matchingDuty.Text.Value is null)
+					extraTip = Localization.Localize("gui.server-bar.tooltip.match", "This duty is in your Wondrous Tails.");
+				else
+					extraTip = Localization.Localize("gui.server-bar.tooltip.inexact", "This duty is in your Wondrous Tails as \"{name}\".")
+						.Replace("{name}", matchingDuty.Text.Value.Description.ToString());
+
+				dtrEntry.Tooltip += "\n\n" + extraTip;
+				dtrEntry.Text = $"\uE0BE {dtrEntry.Text}";
+			}
+
+			dtrEntry.Shown = true;
+		}
+	}
+
 
 	#endregion
 

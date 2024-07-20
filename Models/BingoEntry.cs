@@ -63,7 +63,7 @@ public record BingoEntry {
 	/// </summary>
 	public uint MaxLevel { get; }
 
-	public BingoEntry(uint id, WeeklyBingoOrderData data, IEnumerable<KeyValuePair<ulong, PlayerState.WeeklyBingoTaskStatus>> players, Dictionary<ulong, string> playerNames) {
+	public BingoEntry(uint id, WeeklyBingoOrderData data, IEnumerable<KeyValuePair<ulong, PlayerState.WeeklyBingoTaskStatus>> players, Dictionary<ulong, string> playerNames, Dictionary<ulong, uint> playerStickers) {
 		Id = id;
 		Data = data;
 		Conditions = Helpers.GetConditionsForEntry(Data);
@@ -89,10 +89,20 @@ public record BingoEntry {
 		MaxLevel = max;
 
 		foreach (var entry in players) {
-			if (playerNames.TryGetValue(entry.Key, out string? name))
-				Players.Add((entry.Key, name, entry.Value));
+			uint stickers = playerStickers.GetValueOrDefault(entry.Key);
+			var value = entry.Value;
 
-			switch (entry.Value) {
+			// If a player already has 9 stickers, they don't need any further
+			// duties so make sure to mark any open duties as claimed. This is
+			// not quite accurate but it serves well enough for the purpose
+			// of not showing their names as green next to a duty.
+			if (stickers >= 9 && value == PlayerState.WeeklyBingoTaskStatus.Open)
+				value = PlayerState.WeeklyBingoTaskStatus.Claimed;
+
+			if (playerNames.TryGetValue(entry.Key, out string? name))
+				Players.Add((entry.Key, name, value));
+
+			switch (value) {
 				case PlayerState.WeeklyBingoTaskStatus.Open:
 					PlayersOpen.Add(entry.Key);
 					break;

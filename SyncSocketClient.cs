@@ -26,6 +26,9 @@ public sealed class SyncSocketClient : IDisposable {
 
 	private ConcurrentQueue<WTStatusAndId> updateQueue;
 
+	public int ConnectedClients { get; private set; }
+
+
 	public SyncSocketClient(Plugin plugin, IEnumerable<ulong> ids) {
 		Plugin = plugin;
 		IDs = ids.ToArray();
@@ -37,7 +40,7 @@ public sealed class SyncSocketClient : IDisposable {
 			new Uri(Url),
 			() => {
 				var client = new ClientWebSocket();
-				client.Options.SetRequestHeader("User-Agent", $"WTSync/1.0");
+				client.Options.SetRequestHeader("User-Agent", $"WTSync/{Plugin.ServerClient.Version}");
 				return client;
 			}
 		);
@@ -57,12 +60,20 @@ public sealed class SyncSocketClient : IDisposable {
 		initialDataLoaded.TrySetCanceled();
 	}
 
+	public void SendStatusRequest() {
+		if (webSocket.IsRunning)
+			webSocket.Send("{\"msg\":\"get_status\"}");
+	}
+
 	private void OnReconnect(ReconnectionInfo info) {
 		Service.Logger.Debug($"Connected to server. ({info.Type})");
+		ConnectedClients = 0;
+		SendStatusRequest();
 	}
 
 	private void OnError(DisconnectionInfo info) {
 		Service.Logger.Debug($"Disconnected from server. ({info.Type})");
+		ConnectedClients = 0;
 	}
 
 	private void OnMessage(ResponseMessage message) {
@@ -92,6 +103,18 @@ public sealed class SyncSocketClient : IDisposable {
 							updateQueue.Enqueue(entry);
 
 					initialDataLoaded.TrySetResult();
+					break;
+
+				case "status":
+					var result = decoded["connections"]?.AsValue();
+					if (result != null)
+						try {
+							ConnectedClients = (int) result;
+						} catch (Exception ex) {
+#if DEBUG
+							Service.Logger.Debug($"Error receiving status from server: {ex}");
+#endif
+						}
 					break;
 
 				case "update":

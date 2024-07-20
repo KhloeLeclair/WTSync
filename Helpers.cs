@@ -5,6 +5,8 @@ using System.Diagnostics.CodeAnalysis;
 using Lumina.Excel.GeneratedSheets2;
 using Lumina.Text;
 
+using WTSync.Models;
+
 namespace WTSync;
 
 internal static class Helpers {
@@ -109,6 +111,29 @@ internal static class Helpers {
 			ConditionByInstance.TryAdd(cond.Content.Row, cond);
 		}
 	}
+
+	internal static WeeklyBingoOrderData? GetMatchingEntry(WTStatus status) {
+		var sheet = Service.DataManager.GetExcelSheet<WeeklyBingoOrderData>();
+		if (sheet == null)
+			return null;
+
+		ushort current = Service.ClientState.TerritoryType;
+
+		foreach (var duty in status.Duties) {
+			var row = sheet.GetRow(duty.Id);
+			if (row == null)
+				continue;
+
+			var conds = GetConditionsForEntry(row);
+			foreach (var cond in conds) {
+				if (cond.TerritoryType.Row == current)
+					return row;
+			}
+		}
+
+		return null;
+	}
+
 
 	internal static List<ContentFinderCondition> GetConditionsForEntry(WeeklyBingoOrderData entry) {
 

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Net.Http;
 using System.Net.Http.Json;
+using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
@@ -25,11 +26,14 @@ internal class ServerClient : IDisposable {
 	private readonly Dictionary<ulong, WTStatus?> PendingStatus = [];
 	private Task? UploadTask;
 
+	internal string Version;
+
 	internal ServerClient(Plugin plugin) {
 		Plugin = plugin;
 		Client = new HttpClient();
+		Version = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "1.0";
 
-		Client.DefaultRequestHeaders.UserAgent.Add(new System.Net.Http.Headers.ProductInfoHeaderValue("WTSync", "1.0"));
+		Client.DefaultRequestHeaders.UserAgent.Add(new System.Net.Http.Headers.ProductInfoHeaderValue("WTSync", Version));
 	}
 
 	public void Dispose() {

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 
 using Dalamud.Game.ClientState.Conditions;
 
+using FFXIVClientStructs.FFXIV.Client.Game;
 using FFXIVClientStructs.FFXIV.Client.Game.UI;
 using FFXIVClientStructs.FFXIV.Client.UI.Agent;
 using FFXIVClientStructs.FFXIV.Client.UI.Info;
@@ -126,8 +127,12 @@ internal static class GameState {
 		if (!Service.ClientState.IsLoggedIn)
 			return null;
 
+		// Check to see if the player has the actual journal item.
+		var inv = InventoryManager.Instance();
+		bool hasJournal = !(inv is null || inv->GetInventoryItemCount(2002023) < 1);
+
 		var inst = PlayerState.Instance();
-		if (inst is null || !inst->HasWeeklyBingoJournal || inst->IsWeeklyBingoExpired())
+		if (!hasJournal || inst is null || !inst->HasWeeklyBingoJournal || inst->IsWeeklyBingoExpired())
 			return new WTStatus() {
 				Expires = DateTime.MinValue,
 				Stickers = 0,

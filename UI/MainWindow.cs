@@ -47,6 +47,8 @@ internal class MainWindow : Window, IDisposable {
 	private CancellationTokenSource? destroyStateCancel;
 	private Task? destroyStateTask;
 
+	private DateTime LastPing = DateTime.MinValue;
+
 	public MainWindow(Plugin plugin) : base(
 		"WTSync",
 		NORMAL_FLAGS
@@ -164,6 +166,12 @@ internal class MainWindow : Window, IDisposable {
 				return;
 			}
 
+			var now = DateTime.UtcNow;
+			if (now - LastPing > TimeSpan.FromSeconds(5)) {
+				LastPing = now;
+				SyncSocketClient.SendStatusRequest();
+			}
+
 			if (SyncSocketClient.HasUpdate) {
 				Dictionary<ulong, WTStatus> statuses = new(PartyState.Statuses);
 
@@ -271,12 +279,32 @@ internal class MainWindow : Window, IDisposable {
 
 		bool isSolo = PartyState != null && PartyState.PlayerNames.Count == 1;
 
-		if (!isSolo && SyncSocketClient == null)
+		if (isSolo) {
+			ImGui.TextColored(ImGuiColors.DalamudGrey, Localization.Localize("gui.load-state.offline", "Offline"));
+			if (ImGui.IsItemHovered())
+				ImGui.SetTooltip(Localization.Localize("gui.load-state.offline.about", "You are not in a party, so there is no need to connect to the server to receive data."));
+
+		} else if (SyncSocketClient == null) {
 			ImGui.Text(Localization.Localize("gui.load-state.disconnected", "Disconnected."));
-		else if (!isSolo && SyncSocketClient != null && !SyncSocketClient.IsConnected)
+			if (ImGui.IsItemHovered())
+				ImGui.SetTooltip(Localization.Localize("gui.load-state.disconnected.about", "You are not currently connected to the server."));
+
+		} else if (!SyncSocketClient.IsConnected) {
 			ImGui.Text(Localization.Localize("gui.load-state.connecting", "Connecting..."));
-		else
+			if (ImGui.IsItemHovered())
+				ImGui.SetTooltip(Localization.Localize("gui.load-state.connecting.about", "A connection to the server is being established."));
+
+		} else {
 			ImGui.Text(Localization.Localize("gui.load-state.connected", "Connected."));
+			if (ImGui.IsItemHovered())
+				ImGui.SetTooltip(
+					Localization.Localize(
+						"gui.load-state.connected.about",
+						"You are connected to the server to receive party data.\nThere are currently {client} clients connected."
+					)
+					.Replace("{client}", $"{SyncSocketClient.ConnectedClients}")
+				);
+		}
 
 		ImGui.SameLine(ImGui.GetWindowContentRegionMax().X - 32);
 
@@ -301,7 +329,7 @@ internal class MainWindow : Window, IDisposable {
 		if (Config.ShowExpiration)
 			cols++;
 
-		ImGui.BeginTable("MemberTable", 4, ImGuiTableFlags.RowBg | ImGuiTableFlags.Resizable);
+		ImGui.BeginTable("MemberTable", cols, ImGuiTableFlags.RowBg | ImGuiTableFlags.Resizable);
 
 		ImGui.TableSetupColumn(Localization.Localize("gui.name", "Name"));
 		ImGui.TableSetupColumn(Localization.Localize("gui.stickers", "Stickers"));
