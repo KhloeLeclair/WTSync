@@ -6,7 +6,6 @@ using System.Linq;
 using System.Net.WebSockets;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using System.Threading.Tasks;
 
 using Websocket.Client;
 
@@ -22,9 +21,7 @@ public sealed class SyncSocketClient : IDisposable {
 
 	public ulong[] IDs { get; }
 
-	private TaskCompletionSource initialDataLoaded;
-
-	private ConcurrentQueue<WTStatusAndId> updateQueue;
+	private readonly ConcurrentQueue<WTStatusAndId> updateQueue;
 
 	public int ConnectedClients { get; private set; }
 
@@ -33,7 +30,6 @@ public sealed class SyncSocketClient : IDisposable {
 		Plugin = plugin;
 		IDs = ids.ToArray();
 
-		initialDataLoaded = new TaskCompletionSource();
 		updateQueue = new();
 
 		webSocket = new WebsocketClient(
@@ -45,7 +41,7 @@ public sealed class SyncSocketClient : IDisposable {
 			}
 		);
 
-		webSocket.ReconnectTimeout = null; // TimeSpan.FromSeconds(1);
+		webSocket.ReconnectTimeout = null;
 		webSocket.MessageReceived.Subscribe(OnMessage);
 		webSocket.DisconnectionHappened.Subscribe(OnError);
 		webSocket.ReconnectionHappened.Subscribe(OnReconnect);
@@ -57,7 +53,6 @@ public sealed class SyncSocketClient : IDisposable {
 
 	public void Dispose() {
 		webSocket.Dispose();
-		initialDataLoaded.TrySetCanceled();
 	}
 
 	public void SendStatusRequest() {
@@ -102,7 +97,6 @@ public sealed class SyncSocketClient : IDisposable {
 						foreach (var entry in results)
 							updateQueue.Enqueue(entry);
 
-					initialDataLoaded.TrySetResult();
 					break;
 
 				case "status":

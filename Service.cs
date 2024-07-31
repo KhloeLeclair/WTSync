@@ -31,16 +31,10 @@ internal class Service {
 	internal static IAddonLifecycle AddonLifecycle { get; private set; } = null!;
 
 	[PluginService]
-	internal static IAddonEventManager AddonEventManager { get; private set; } = null!;
-
-	[PluginService]
 	internal static IPartyList PartyList { get; private set; } = null!;
 
 	[PluginService]
 	internal static IFramework Framework { get; private set; } = null!;
-
-	[PluginService]
-	internal static IObjectTable ObjectTable { get; private set; } = null!;
 
 	[PluginService]
 	internal static IGameConfig GameConfig { get; private set; } = null!;

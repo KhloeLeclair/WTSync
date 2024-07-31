@@ -187,10 +187,16 @@ public sealed class Plugin : IDalamudPlugin {
 			return null;
 
 		var members = PartyMemberTracker.Members;
-		var client = members.Count == 1 ? null : ServerClient.StartStatusFeed(members.Select(x => x.Id));
+		var client = members.Count == 1 ? null : ServerClient.StartStatusFeed(members
+			.Select(x => x.Id)
+			// We don't need to subscribe to our own WT state.
+			.Where(x => x != Service.ClientState.LocalContentId)
+		);
 
 		Dictionary<ulong, WTStatus> statuses = [];
-		statuses[Service.ClientState.LocalContentId] = GameState.ReadStatus()!;
+		var status = GameState.ReadStatus();
+		if (status != null)
+			statuses[Service.ClientState.LocalContentId] = status;
 
 		return (client, new(members, statuses));
 	}
@@ -214,15 +220,18 @@ public sealed class Plugin : IDalamudPlugin {
 				? Helpers.GetMatchingEntry(BarStatus)
 				: null;
 
-			int claimable = 0;
+			int claimable = (int) BarStatus.Stickers;
 			foreach (var duty in BarStatus.Duties) {
 				if (duty.Status == PlayerState.WeeklyBingoTaskStatus.Claimable)
 					claimable++;
 			}
 
+			if (claimable > 9)
+				claimable = 9;
+
 			dtrEntry.Tooltip = Localization.Localize("gui.server-bar.tooltip", "Wondrous Tails Completion");
 			dtrEntry.Text = Localization.Localize("gui.server-bar.info", "WT: {stickers} / 9  {points}")
-				.Replace("{stickers}", (BarStatus.Stickers + claimable).ToString())
+				.Replace("{stickers}", claimable.ToString())
 				.Replace("{points}", BarStatus.SecondChancePoints.ToInstanceNumber());
 
 			if (matchingDuty != null) {
@@ -290,6 +299,10 @@ public sealed class Plugin : IDalamudPlugin {
 		var addon = (AtkUnitBase*) Service.GameGui.GetAddonByName("WeeklyBingo", 1);
 		if (addon is not null && addon->IsVisible)
 			return true;
+
+		// If we are occupied, we can't use an item.
+		if (GameState.IsOccupied || GameState.IsDead || GameState.IsCasting)
+			return false;
 
 		// First, check if we actually have the item to use.
 		var inv = InventoryManager.Instance();

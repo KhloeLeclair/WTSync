@@ -33,6 +33,49 @@ internal static class GameState {
 		}
 	}
 
+	internal static bool IsDead {
+		get {
+			if (!Service.ClientState.IsLoggedIn || Service.ClientState.LocalPlayer == null)
+				return false;
+
+			return Service.ClientState.LocalPlayer.IsDead || Service.Condition.Any(ConditionFlag.Unconscious);
+		}
+	}
+
+	internal static bool IsCasting {
+		get {
+			if (!Service.ClientState.IsLoggedIn || Service.ClientState.LocalPlayer == null)
+				return false;
+
+			return Service.ClientState.LocalPlayer.IsCasting || Service.Condition.Any(
+				ConditionFlag.Casting,
+				ConditionFlag.Casting87
+			);
+		}
+	}
+
+	internal static bool IsOccupied {
+		get {
+			if (!Service.ClientState.IsLoggedIn)
+				return false;
+
+			return Service.Condition.Any(
+				ConditionFlag.BetweenAreas,
+				ConditionFlag.BetweenAreas51,
+				ConditionFlag.Occupied,
+				ConditionFlag.Occupied30,
+				ConditionFlag.Occupied33,
+				ConditionFlag.Occupied38,
+				ConditionFlag.Occupied39,
+				ConditionFlag.OccupiedInCutSceneEvent,
+				ConditionFlag.OccupiedInEvent,
+				ConditionFlag.OccupiedInQuestEvent,
+				ConditionFlag.OccupiedSummoningBell,
+				ConditionFlag.InThatPosition
+			);
+		}
+	}
+
 	internal static bool IsInDuty {
 		get {
 			if (!Service.ClientState.IsLoggedIn)
@@ -133,12 +176,12 @@ internal static class GameState {
 
 		var inst = PlayerState.Instance();
 		if (!hasJournal || inst is null || !inst->HasWeeklyBingoJournal || inst->IsWeeklyBingoExpired())
-			return new WTStatus() {
+			return null; /* new WTStatus() {
 				Expires = DateTime.MinValue,
 				Stickers = 0,
 				SecondChancePoints = inst is null ? 0 : inst->WeeklyBingoNumSecondChancePoints,
 				Duties = []
-			};
+			};*/
 
 		WTDutyStatus[] Duties = new WTDutyStatus[16];
 

@@ -345,17 +345,25 @@ internal class MainWindow : Window, IDisposable {
 
 		foreach (var entry in PartyState.PlayerNames) {
 			string name = Helpers.Abbreviate(entry.Value, nameType);
+			bool state = PartyState.PlayerFilters.Contains(entry.Key);
 
 			ImGui.TableNextRow();
 
 			ImGui.TableNextColumn();
 
-			// TODO: Add filtering by player, toggled by clicking their name.
-
-			if (entry.Key == Service.ClientState.LocalContentId)
+			if (state)
+				//if (entry.Key == Service.ClientState.LocalContentId)
 				ImGui.TextColored(ImGuiColors.ParsedGreen, name);
 			else
 				ImGui.Text(name);
+
+			if (ImGui.IsItemClicked()) {
+				if (state)
+					PartyState.PlayerFilters.Remove(entry.Key);
+				else
+					PartyState.PlayerFilters.Add(entry.Key);
+				PartyState.UpdateFilters();
+			}
 
 			if (PartyState.Statuses.TryGetValue(entry.Key, out var status)) {
 				uint stickers = PartyState.Stickers.GetValueOrDefault(entry.Key);
@@ -443,6 +451,29 @@ internal class MainWindow : Window, IDisposable {
 		ImGui.PopStyleColor();
 		ImGui.PopStyleColor();
 
+		ImGui.SameLine(ImGui.GetWindowContentRegionMax().X - 32);
+		ImGui.PushID($"filternoopen");
+
+		bool filterNo = PartyState.FilterNoOpen;
+		if (filterNo) {
+			ImGui.PushStyleColor(ImGuiCol.Button, ImGuiColors.DalamudOrange);
+			ImGui.PushStyleColor(ImGuiCol.ButtonHovered, ImGuiColors.DalamudOrange);
+		}
+
+		if (ImGuiComponents.IconButton(filterNo ? FontAwesomeIcon.FilterCircleXmark : FontAwesomeIcon.Filter)) {
+			PartyState.FilterNoOpen = !filterNo;
+		}
+
+		if (filterNo) {
+			ImGui.PopStyleColor();
+			ImGui.PopStyleColor();
+		}
+
+		if (ImGui.IsItemHovered())
+			ImGui.SetTooltip(Localization.Localize("gui.filter.no-players", "Do not show duties that no players have open."));
+
+		ImGui.PopID();
+
 		// Level Range Filtering
 
 		ImGui.Text(Localization.Localize("gui.filter.level", "Level:"));
@@ -479,7 +510,7 @@ internal class MainWindow : Window, IDisposable {
 			if (ImGui.IsItemClicked(ImGuiMouseButton.Right)) {
 				bool wasLastButton = LastClickedThing < 0;
 				bool wasLastClicked = wasLastButton && LastClickedThing == -lvl;
-				LastClickedThing = -((int) lvl);
+				LastClickedThing = -(int) lvl;
 				ClickIndex = wasLastClicked
 					? (ClickIndex + 1) % 3
 					: (wasLastButton && ClickIndex != 2)
@@ -519,7 +550,7 @@ internal class MainWindow : Window, IDisposable {
 			}
 
 			if (ImGui.IsItemHovered())
-				ImGui.SetTooltip($"Lv. {last} - {lvl}");
+				ImGui.SetTooltip($"Lv. {last}-{lvl}");
 
 			last = lvl;
 		}
@@ -669,7 +700,6 @@ internal class MainWindow : Window, IDisposable {
 
 		LastSize = ImGui.GetWindowSize();
 		if (LastClickedThing != 0 && (ImGui.IsMouseClicked(ImGuiMouseButton.Left) || ImGui.IsMouseClicked(ImGuiMouseButton.Right)) && !got_click) {
-			Service.Logger.Debug($"Clicked something else.");
 			LastClickedThing = 0;
 		}
 	}

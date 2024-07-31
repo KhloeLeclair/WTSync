@@ -57,7 +57,27 @@ public class PartyBingoState {
 
 	#region Filter Data
 
-	// TODO: Persist filter data.
+	// TODO: Persist filter data in some better way?
+
+	private static bool _FilterNoOpen;
+
+	public bool FilterNoOpen {
+		get => _FilterNoOpen;
+		set {
+			_FilterNoOpen = value;
+			_CachedDisplayEntries = null;
+		}
+	}
+
+	private static List<ulong> _PlayerFilters = [];
+
+	public List<ulong> PlayerFilters {
+		get => _PlayerFilters;
+		set {
+			_PlayerFilters = value;
+			_CachedDisplayEntries = null;
+		}
+	}
 
 	private static bool[] _LevelFilters = new bool[LEVEL_GROUPS.Length];
 
@@ -115,6 +135,11 @@ public class PartyBingoState {
 				if (duty.Status == PlayerState.WeeklyBingoTaskStatus.Claimable)
 					count++;
 			}
+
+			// Sanity check, in case someone has completed more duties
+			// than they actually need to.
+			if (count > 9)
+				count = 9;
 
 			Stickers[entry.Key] = count;
 		}
@@ -191,16 +216,38 @@ public class PartyBingoState {
 				levelsToggled++;
 		}
 
+		int playersToggled = 0;
+		foreach (ulong entry in _PlayerFilters) {
+			if (PlayerNames.ContainsKey(entry))
+				playersToggled++;
+		}
+
 		bool filterTypes = typesToggled != 0 && typesToggled != ContentTypes.Count;
 		bool filterLevels = levelsToggled != 0 && levelsToggled != LEVEL_GROUPS.Length;
+		bool filterPlayers = playersToggled != 0 && playersToggled != PlayerNames.Count;
 
-		if (!filterLevels && !filterTypes) {
+		if (!filterLevels && !filterTypes && !filterPlayers && !_FilterNoOpen) {
 			_CachedDisplayEntries = new(Entries);
 
 		} else {
 			_CachedDisplayEntries = [];
 
 			foreach (var entry in Entries) {
+				if (_FilterNoOpen && entry.PlayersOpen.Count == 0)
+					continue;
+
+				if (filterPlayers) {
+					bool matched = false;
+					foreach (var who in entry.Players) {
+						if (_PlayerFilters.Contains(who.Item1)) {
+							matched = true;
+							break;
+						}
+					}
+					if (!matched)
+						continue;
+				}
+
 				if (filterTypes) {
 					bool matched = false;
 					foreach (var type in entry.ContentTypes) {
