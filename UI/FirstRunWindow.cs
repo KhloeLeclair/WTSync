@@ -41,7 +41,7 @@ internal class FirstRunWindow : Window {
 		string label = Localization.Localize("gui.first-run.welcome", "Welcome to WTSync!");
 		ImGui.TextColored(ImGuiColors.ParsedOrange, label);
 
-		string terms = Localization.Localize("gui.first-run.terms", "WTSync operates by uploading your Wondrous Tails data to a server, from which other clients can download it. To uniquely identify your character, WTSync makes uses of what's known as a \"content id\". This is information that, as of Dawntrail, is sent to every player's client for every player character they encounter.\n\nBy agreeing to use WTSync, you agree that your characters' content IDs, as well as details of your Wondrous Tails state, may be stored on our server and shared with other users of the WTSync service.\n\nCurious exactly what it looks like? WTSync, as well as its server, are open-source! Contributions are welcome.");
+		string terms = Localization.Localize("gui.first-run.terms", "WTSync operates by uploading your Wondrous Tails data to a server, from which other clients can download it. To uniquely identify your character, WTSync transmits a hash of your character's name and home world.\n\nBy agreeing to use WTSync, you agree that your characters' names and home worlds, as well as details of your Wondrous Tails state, may be stored on our server and shared with other users of the WTSync service.\n\nCurious exactly what it looks like? WTSync, as well as its server, are open-source! Contributions are welcome.");
 
 		ImGui.Spacing();
 
