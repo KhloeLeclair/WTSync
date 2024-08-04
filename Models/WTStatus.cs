@@ -7,7 +7,7 @@ using FFXIVClientStructs.FFXIV.Client.Game.UI;
 namespace WTSync.Models;
 
 public record WTStatusAndId {
-	public ulong Id { get; set; }
+	public string Id { get; set; } = string.Empty;
 	public WTStatus? Status { get; set; }
 }
 

@@ -36,22 +36,22 @@ public record BingoEntry {
 	/// <summary>
 	/// A list of player IDs for players that have this order and haven't done it yet.
 	/// </summary>
-	public List<ulong> PlayersOpen { get; } = [];
+	public List<string> PlayersOpen { get; } = [];
 
 	/// <summary>
 	/// A list of player IDs for players that have this order, and have completed it, but haven't claimed it yet
 	/// </summary>
-	public List<ulong> PlayersClaimable { get; } = [];
+	public List<string> PlayersClaimable { get; } = [];
 
 	/// <summary>
 	/// A list of player IDs for players that have this order and have completed and claimed it.
 	/// </summary>
-	public List<ulong> PlayersClaimed { get; } = [];
+	public List<string> PlayersClaimed { get; } = [];
 
 	/// <summary>
 	/// A list of all players that have this order, their names, and their statuses.
 	/// </summary>
-	public List<(ulong, string, PlayerState.WeeklyBingoTaskStatus)> Players { get; } = [];
+	public List<(string, string, PlayerState.WeeklyBingoTaskStatus)> Players { get; } = [];
 
 	/// <summary>
 	/// The minimum level of content for this WeeklyBingoOrder.
@@ -63,7 +63,7 @@ public record BingoEntry {
 	/// </summary>
 	public uint MaxLevel { get; }
 
-	public BingoEntry(uint id, WeeklyBingoOrderData data, IEnumerable<KeyValuePair<ulong, PlayerState.WeeklyBingoTaskStatus>> players, Dictionary<ulong, string> playerNames, Dictionary<ulong, uint> playerStickers) {
+	public BingoEntry(uint id, WeeklyBingoOrderData data, IEnumerable<KeyValuePair<string, PlayerState.WeeklyBingoTaskStatus>> players, Dictionary<string, string> playerNames, Dictionary<string, uint> playerStickers) {
 		Id = id;
 		Data = data;
 		Conditions = Helpers.GetConditionsForEntry(Data);

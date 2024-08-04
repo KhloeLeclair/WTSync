@@ -44,7 +44,7 @@ public sealed class Plugin : IDalamudPlugin {
 
 	internal PartyMemberTracker PartyMemberTracker { get; private set; }
 
-	internal Dictionary<ulong, WTStatus?> PreviousStatus { get; init; } = [];
+	internal Dictionary<string, WTStatus?> PreviousStatus { get; init; } = [];
 
 	#region Life Cycle
 
@@ -80,6 +80,7 @@ public sealed class Plugin : IDalamudPlugin {
 
 		// Events
 		Service.ClientState.Login += OnLogin;
+		Service.ClientState.Logout += OnLogout;
 		Service.ClientState.TerritoryChanged += OnTerritoryChanged;
 		Service.Interface.UiBuilder.Draw += OnDraw;
 		Service.Interface.UiBuilder.OpenConfigUi += OnOpenConfig;
@@ -128,6 +129,7 @@ public sealed class Plugin : IDalamudPlugin {
 
 		// Event Cleanup
 		Service.ClientState.Login -= OnLogin;
+		Service.ClientState.Logout -= OnLogout;
 		Service.ClientState.TerritoryChanged -= OnTerritoryChanged;
 		Service.Interface.UiBuilder.Draw -= OnDraw;
 		Service.Interface.UiBuilder.OpenConfigUi -= OnOpenConfig;
@@ -156,14 +158,15 @@ public sealed class Plugin : IDalamudPlugin {
 	#region Server Communication
 
 	public void SendServerUpdate() {
-		if (!Service.ClientState.IsLoggedIn)
+		string? myId = GameState.LocalPlayerId;
+		if (myId == null || !Service.ClientState.IsLoggedIn)
 			return;
 
 		if (!Config.AcceptedTerms)
 			return;
 
 		var result = new WTStatusAndId() {
-			Id = Service.ClientState.LocalContentId,
+			Id = myId,
 			Status = GameState.ReadStatus()
 		};
 
@@ -183,20 +186,21 @@ public sealed class Plugin : IDalamudPlugin {
 	}
 
 	public (SyncSocketClient?, PartyBingoState)? GetPartyDutyFeed() {
-		if (!Service.ClientState.IsLoggedIn)
+		string? myId = GameState.LocalPlayerId;
+		if (myId is null)
 			return null;
 
 		var members = PartyMemberTracker.Members;
 		var client = members.Count == 1 ? null : ServerClient.StartStatusFeed(members
 			.Select(x => x.Id)
 			// We don't need to subscribe to our own WT state.
-			.Where(x => x != Service.ClientState.LocalContentId)
+			.Where(x => x != myId)
 		);
 
-		Dictionary<ulong, WTStatus> statuses = [];
+		Dictionary<string, WTStatus> statuses = [];
 		var status = GameState.ReadStatus();
 		if (status != null)
-			statuses[Service.ClientState.LocalContentId] = status;
+			statuses[myId] = status;
 
 		return (client, new(members, statuses));
 	}
@@ -257,6 +261,11 @@ public sealed class Plugin : IDalamudPlugin {
 
 	private void OnRefreshBingo(AddonEvent type, AddonArgs args) {
 		SendServerUpdate();
+	}
+
+	private void OnLogout() {
+		ServerClient.HandleLogout(PreviousStatus.Keys);
+		PreviousStatus.Clear();
 	}
 
 	private void OnLogin() {

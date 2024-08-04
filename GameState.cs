@@ -89,11 +89,29 @@ internal static class GameState {
 		}
 	}
 
+	private static string? _LocalPlayerId;
+	private static ulong _LocalContentId = 0;
+
+	internal static string? LocalPlayerId {
+		get {
+			if (_LocalContentId != Service.ClientState.LocalContentId || _LocalPlayerId == null) {
+				_LocalContentId = Service.ClientState.LocalContentId;
+				var player = Service.ClientState.LocalPlayer;
+				if (player == null)
+					_LocalPlayerId = null;
+				else
+					_LocalPlayerId = $"{player.Name}@{player.HomeWorld.Id}".ToSha256();
+			}
+
+			return _LocalPlayerId;
+		}
+	}
+
 	internal static List<PartyMember> ReadPartyMembers() {
 		if (!Service.ClientState.IsLoggedIn)
 			return [];
 
-		return ReadCWParty() ?? ReadNormalParty();
+		return ReadCWParty() ?? ReadNormalGroup();
 	}
 
 	internal static int GetPartyCount() {
@@ -103,25 +121,34 @@ internal static class GameState {
 		return ReadCWPartyCount() ?? ReadNormalPartyCount();
 	}
 
-	private static int ReadNormalPartyCount() {
-		int result = Service.PartyList.Count;
-		return result == 0 ? 1 : result;
+	private static unsafe int ReadNormalPartyCount() {
+		var inst = FFXIVClientStructs.FFXIV.Client.Game.Group.GroupManager.Instance();
+		int amount = 0;
+		if (inst is not null) {
+			var group = inst->GetGroup();
+			if (!group->IsAlliance && !group->IsSmallGroupAlliance)
+				amount = group->MemberCount;
+		}
+
+		return amount == 0 ? 1 : amount;
 	}
 
-	private static List<PartyMember> ReadNormalParty() {
+	private static unsafe List<PartyMember> ReadNormalGroup() {
 		List<PartyMember> result = [];
 
-		if (Service.PartyList.Count == 0) {
-			if (Service.ClientState.LocalPlayer != null && Service.ClientState.LocalContentId > 0)
-				result.Add(new(Service.ClientState.LocalPlayer.Name.ToString(), (ulong) Service.ClientState.LocalContentId));
-			return result;
+		var inst = FFXIVClientStructs.FFXIV.Client.Game.Group.GroupManager.Instance();
+		if (inst is not null) {
+			var group = inst->GetGroup();
+			if (!group->IsAlliance && !group->IsSmallGroupAlliance)
+				for (int i = 0; i < group->MemberCount; i++) {
+					var member = group->PartyMembers[i];
+					if (member.ContentId > 0)
+						result.Add(new(member.NameString, member.ToId()));
+				}
 		}
 
-		for (int i = 0; i < Service.PartyList.Count; i++) {
-			var member = Service.PartyList[i];
-			if (member is not null && member.ContentId > 0)
-				result.Add(new(member.Name.ToString(), (ulong) member.ContentId));
-		}
+		if (result.Count == 0 && Service.ClientState.LocalPlayer != null && Service.ClientState.LocalContentId > 0)
+			result.Add(new(Service.ClientState.LocalPlayer.Name.ToString(), GameState.LocalPlayerId!));
 
 		return result;
 	}
@@ -160,7 +187,7 @@ internal static class GameState {
 		for (int i = 0; i < group.GroupMemberCount; i++) {
 			var member = group.GroupMembers[i];
 			if (member.ContentId > 0)
-				result.Add(new(member.NameString, member.ContentId));
+				result.Add(new(member.NameString, member.ToId()));
 		}
 
 		return result;

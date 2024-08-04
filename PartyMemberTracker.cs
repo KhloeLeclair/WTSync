@@ -45,6 +45,11 @@ public sealed class PartyMemberTracker : IDisposable {
 
 		// Still here? The party changed.
 		var members = GameState.ReadPartyMembers();
+
+		// Double check, in case there was a mismatch in GetPartyCount somehow.
+		if (members.Count == existing)
+			return;
+
 #if DEBUG
 		Service.Logger.Debug($"Party list changed!\nExisting: {string.Join(", ", CachedMembers ?? [])}\nNew: {string.Join(", ", members)}");
 #endif

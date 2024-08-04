@@ -4,7 +4,6 @@ using System.Net.Http;
 using System.Net.Http.Json;
 using System.Reflection;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 
 using WTSync.Models;
@@ -14,7 +13,7 @@ namespace WTSync;
 internal class ServerClient : IDisposable {
 
 	public static readonly JsonSerializerOptions JSON_OPTIONS = new() {
-		NumberHandling = JsonNumberHandling.WriteAsString | JsonNumberHandling.AllowReadingFromString,
+		//NumberHandling = JsonNumberHandling.WriteAsString | JsonNumberHandling.AllowReadingFromString,
 		AllowTrailingCommas = true,
 		PropertyNameCaseInsensitive = true,
 		PropertyNamingPolicy = JsonNamingPolicy.CamelCase
@@ -23,8 +22,10 @@ internal class ServerClient : IDisposable {
 	private readonly Plugin Plugin;
 	private readonly HttpClient Client;
 
-	private readonly Dictionary<ulong, WTStatus?> PendingStatus = [];
+	private readonly Dictionary<string, WTStatus?> PendingStatus = [];
 	private Task? UploadTask;
+
+	internal bool isLoggingOut;
 
 	internal string Version;
 
@@ -43,13 +44,28 @@ internal class ServerClient : IDisposable {
 		Client.Dispose();
 	}
 
-	public SyncSocketClient StartStatusFeed(IEnumerable<ulong> ids) {
+	public SyncSocketClient StartStatusFeed(IEnumerable<string> ids) {
 		return new SyncSocketClient(Plugin, ids);
 	}
 
-	public void PostUpdate(ulong id, WTStatus? status) {
+	public void PostUpdate(string id, WTStatus? status) {
+		isLoggingOut = false;
+
 		lock (PendingStatus) {
 			PendingStatus[id] = status;
+		}
+
+		MaybeScheduleSubmission();
+	}
+
+	public void HandleLogout(IEnumerable<string> ids) {
+		isLoggingOut = true;
+
+		lock (PendingStatus) {
+			PendingStatus.Clear();
+
+			foreach (string id in ids)
+				PendingStatus[id] = null;
 		}
 
 		MaybeScheduleSubmission();
@@ -72,7 +88,8 @@ internal class ServerClient : IDisposable {
 
 	public async Task SubmitUpdates() {
 		// First, make sure to let some time pass in case the user does more things.
-		await Task.Delay(5000);
+		if (!isLoggingOut)
+			await Task.Delay(5000);
 
 		// Now, get the updates to send.
 		List<WTStatusAndId> entries = [];

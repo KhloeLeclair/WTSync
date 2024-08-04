@@ -15,17 +15,17 @@ public class PartyBingoState {
 	/// <summary>
 	/// A map of player IDs to their names.
 	/// </summary>
-	public Dictionary<ulong, string> PlayerNames { get; }
+	public Dictionary<string, string> PlayerNames { get; }
 
 	/// <summary>
 	/// A map of player IDs to their WTStatus entries.
 	/// </summary>
-	public Dictionary<ulong, WTStatus> Statuses { get; private set; }
+	public Dictionary<string, WTStatus> Statuses { get; private set; }
 
 	/// <summary>
 	/// A map of player IDs to the number of stickers they have earned (including claimable duties).
 	/// </summary>
-	public Dictionary<ulong, uint> Stickers { get; private set; }
+	public Dictionary<string, uint> Stickers { get; private set; }
 
 	/// <summary>
 	/// A list of BingoEntry instances for every bingo entry of
@@ -69,9 +69,9 @@ public class PartyBingoState {
 		}
 	}
 
-	private static List<ulong> _PlayerFilters = [];
+	private static List<string> _PlayerFilters = [];
 
-	public List<ulong> PlayerFilters {
+	public List<string> PlayerFilters {
 		get => _PlayerFilters;
 		set {
 			_PlayerFilters = value;
@@ -101,7 +101,7 @@ public class PartyBingoState {
 
 	#endregion
 
-	public PartyBingoState(List<PartyMember> members, IEnumerable<KeyValuePair<ulong, WTStatus>>? statuses) {
+	public PartyBingoState(List<PartyMember> members, IEnumerable<KeyValuePair<string, WTStatus>>? statuses) {
 		// First, load the party names.
 		PlayerNames = [];
 		foreach (var member in members)
@@ -115,7 +115,7 @@ public class PartyBingoState {
 	[MemberNotNull(nameof(Stickers))]
 	[MemberNotNull(nameof(Entries))]
 	[MemberNotNull(nameof(ContentTypes))]
-	public void UpdateStatuses(IEnumerable<KeyValuePair<ulong, WTStatus>> statuses) {
+	public void UpdateStatuses(IEnumerable<KeyValuePair<string, WTStatus>> statuses) {
 		Statuses = new(statuses);
 
 		UpdateStickers();
@@ -160,7 +160,7 @@ public class PartyBingoState {
 			return;
 
 		// First, collect all the duties, and which players have them.
-		Dictionary<uint, Dictionary<ulong, PlayerState.WeeklyBingoTaskStatus>> Orders = [];
+		Dictionary<uint, Dictionary<string, PlayerState.WeeklyBingoTaskStatus>> Orders = [];
 
 		foreach (var entry in Statuses) {
 			foreach (var duty in entry.Value.Duties) {
@@ -217,7 +217,7 @@ public class PartyBingoState {
 		}
 
 		int playersToggled = 0;
-		foreach (ulong entry in _PlayerFilters) {
+		foreach (string entry in _PlayerFilters) {
 			if (PlayerNames.ContainsKey(entry))
 				playersToggled++;
 		}

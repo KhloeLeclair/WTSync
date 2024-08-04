@@ -173,7 +173,7 @@ internal class MainWindow : Window, IDisposable {
 			}
 
 			if (SyncSocketClient.HasUpdate) {
-				Dictionary<ulong, WTStatus> statuses = new(PartyState.Statuses);
+				Dictionary<string, WTStatus> statuses = new(PartyState.Statuses);
 
 				while (true) {
 					if (!SyncSocketClient.TryGetUpdate(out var update))

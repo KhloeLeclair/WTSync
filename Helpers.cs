@@ -1,6 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using System.Security.Cryptography;
+using System.Text;
+
+using Dalamud.Game.ClientState.Party;
+
+using FFXIVClientStructs.FFXIV.Client.UI.Info;
 
 using Lumina.Excel.GeneratedSheets2;
 using Lumina.Text;
@@ -10,6 +16,28 @@ using WTSync.Models;
 namespace WTSync;
 
 internal static class Helpers {
+
+	internal static string ToSha256(this string input) {
+		if (string.IsNullOrEmpty(input))
+			return string.Empty;
+
+		byte[] buffer = Encoding.UTF8.GetBytes(input);
+		byte[] digest = SHA256.HashData(buffer);
+
+		return BitConverter.ToString(digest).Replace("-", string.Empty);
+	}
+
+	internal static string ToId(this FFXIVClientStructs.FFXIV.Client.Game.Group.PartyMember member) {
+		return $"{member.NameString}@{member.HomeWorld}".ToSha256();
+	}
+
+	internal static string ToId(this IPartyMember member) {
+		return $"{member.Name}@{member.World.Id}".ToSha256();
+	}
+
+	internal static string ToId(this CrossRealmMember member) {
+		return $"{member.NameString}@{member.HomeWorld}".ToSha256();
+	}
 
 	internal static string ToInstanceNumber(this int input) {
 		if (input < 0) return $"{input}";

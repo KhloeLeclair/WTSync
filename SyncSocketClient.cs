@@ -19,14 +19,14 @@ public sealed class SyncSocketClient : IDisposable {
 
 	private readonly WebsocketClient webSocket;
 
-	public ulong[] IDs { get; }
+	public string[] IDs { get; }
 
 	private readonly ConcurrentQueue<WTStatusAndId> updateQueue;
 
 	public int ConnectedClients { get; private set; }
 
 
-	public SyncSocketClient(Plugin plugin, IEnumerable<ulong> ids) {
+	public SyncSocketClient(Plugin plugin, IEnumerable<string> ids) {
 		Plugin = plugin;
 		IDs = ids.ToArray();
 
