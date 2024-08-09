@@ -575,46 +575,51 @@ internal class MainWindow : Window, IDisposable {
 
 			// First, the image for the entry.
 			var imgWrap = entry.Icon.GetWrapOrEmpty();
-			ImGui.Image(imgWrap.ImGuiHandle, new Vector2(imgWrap.Width, imgWrap.Height));
+			int width = (int) (imgWrap.Width * Plugin.Config.ImageScale);
+			int height = (int) (imgWrap.Height * Plugin.Config.ImageScale);
 
-			// Behavior: If the user clicks / right-clicks the image, we should
-			// open the Duty Finder for them.
-			bool rightClicked = ImGui.IsItemClicked(ImGuiMouseButton.Right);
-			if (rightClicked || ImGui.IsItemClicked()) {
-				// Click Tracking
-				bool wasLastClicked = LastClickedThing == entry.Id;
-				LastClickedThing = (int) entry.Id;
-				got_click = true;
+			if (width > 0 && height > 0) {
+				ImGui.Image(imgWrap.ImGuiHandle, new Vector2(width, height));
 
-				if (entry.Data.Type == 3 && entry.Data.Data.Row == 6)
-					GameState.OpenRoulette(7); // Frontline
+				// Behavior: If the user clicks / right-clicks the image, we should
+				// open the Duty Finder for them.
+				bool rightClicked = ImGui.IsItemClicked(ImGuiMouseButton.Right);
+				if (rightClicked || ImGui.IsItemClicked()) {
+					// Click Tracking
+					bool wasLastClicked = LastClickedThing == entry.Id;
+					LastClickedThing = (int) entry.Id;
+					got_click = true;
 
-				else if (entry.Data.Type == 3 && entry.Data.Data.Row == 5)
-					GameState.OpenRoulette(40); // Crystalline Conflict
+					if (entry.Data.Type == 3 && entry.Data.Data.Row == 6)
+						GameState.OpenRoulette(7); // Frontline
 
-				else if (entry.Conditions.Count > 0) {
-					int direction = rightClicked ? -1 : 1;
-					ClickIndex = wasLastClicked ? ClickIndex + direction : 0;
-					if (ClickIndex < 0)
-						ClickIndex = entry.Conditions.Count - 1;
-					else
-						ClickIndex %= entry.Conditions.Count;
+					else if (entry.Data.Type == 3 && entry.Data.Data.Row == 5)
+						GameState.OpenRoulette(40); // Crystalline Conflict
 
-					GameState.OpenDutyFinder(entry.Conditions[ClickIndex]);
+					else if (entry.Conditions.Count > 0) {
+						int direction = rightClicked ? -1 : 1;
+						ClickIndex = wasLastClicked ? ClickIndex + direction : 0;
+						if (ClickIndex < 0)
+							ClickIndex = entry.Conditions.Count - 1;
+						else
+							ClickIndex %= entry.Conditions.Count;
+
+						GameState.OpenDutyFinder(entry.Conditions[ClickIndex]);
+					}
 				}
-			}
 
-			// Behavior: Display a list of matching duties when hovering over the image.
-			if (ImGui.IsItemHovered()) {
-				string? tip = entry.ToolTip;
-				if (!string.IsNullOrEmpty(tip))
-					ImGui.SetTooltip(tip);
+				// Behavior: Display a list of matching duties when hovering over the image.
+				if (ImGui.IsItemHovered()) {
+					string? tip = entry.ToolTip;
+					if (!string.IsNullOrEmpty(tip))
+						ImGui.SetTooltip(tip);
+				}
 			}
 
 			// Now that we've drawn the image, store the right-side + padding position so we
 			// can use it as necessary. Also store the maximum Y position.
-			float startX = pos.X + imgWrap.Width + style.WindowPadding.X;
-			float maxY = pos.Y + imgWrap.Height;
+			float startX = pos.X + width + (width > 0 ? style.WindowPadding.X : 0);
+			float maxY = pos.Y + height;
 
 			// Next, we need to draw the title of this entry.
 			ImGui.SetCursorPos(new Vector2(startX, pos.Y));

@@ -21,6 +21,9 @@ public class Configuration : IPluginConfiguration {
 
 	public bool ShowSCP { get; set; } = true;
 
+	public float ImageScale { get; set; } = 1.0f;
+
+
 	public void Save() {
 		if (Plugin.Instance.Config == this)
 			Service.Interface.SavePluginConfig(this);

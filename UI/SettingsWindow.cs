@@ -80,6 +80,17 @@ internal class SettingsWindow : Window {
 		if (ImGui.IsItemHovered())
 			ImGui.SetTooltip(Localization.Localize("gui.setting.show-scp.tip", "When this is enabled, a second chance points column will be displayed in the player list at the top of the WTSync window."));
 
+		ImGui.Spacing();
+
+		float value = Config.ImageScale;
+		if (ImGui.SliderFloat(Localization.Localize("gui.setting.image-scale", "Image Scale"), ref value, 0f, 2f, "%.1fx")) {
+			Config.ImageScale = value;
+			Config.Save();
+		}
+
+		if (ImGui.IsItemHovered())
+			ImGui.SetTooltip(Localization.Localize("gui.setting.image-scale.tip", "This lets you adjust the size of the preview image shown for each entry."));
+
 
 	}
 }
