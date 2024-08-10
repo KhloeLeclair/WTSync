@@ -116,7 +116,7 @@ internal class MainWindow : Window, IDisposable {
 		if (side == 1)
 			x += addon->GetScaledWidth(true) - (addon->Scale * 100);
 		else if (LastSize.HasValue)
-			x -= LastSize.Value.X;
+			x -= LastSize.Value.X - (addon->Scale * 40);
 
 		Position = new(x, addon->Y);
 		PositionCondition = ImGuiCond.Always;
@@ -277,7 +277,7 @@ internal class MainWindow : Window, IDisposable {
 
 		UpdateFlags();
 
-		bool isSolo = PartyState != null && PartyState.PlayerNames.Count == 1;
+		bool isSolo = PartyState != null && PartyState.PlayerNames.Count <= 1;
 
 		if (isSolo) {
 			ImGui.TextColored(ImGuiColors.DalamudGrey, Localization.Localize("gui.load-state.offline", "Offline"));
@@ -353,7 +353,7 @@ internal class MainWindow : Window, IDisposable {
 
 			if (state)
 				//if (entry.Key == Service.ClientState.LocalContentId)
-				ImGui.TextColored(ImGuiColors.ParsedGreen, name);
+				ImGui.TextColored(Config.ColorButtonActive, name);
 			else
 				ImGui.Text(name);
 
@@ -371,7 +371,7 @@ internal class MainWindow : Window, IDisposable {
 				ImGui.TableNextColumn();
 				string text = $"{stickers} / 9";
 				if (stickers == 9)
-					ImGui.TextColored(ImGuiColors.ParsedOrange, text);
+					ImGui.TextColored(Config.ColorMaxStickers, text);
 				else
 					ImGui.Text(text);
 
@@ -379,7 +379,7 @@ internal class MainWindow : Window, IDisposable {
 					uint points = status.SecondChancePoints;
 					ImGui.TableNextColumn();
 					if (points == 9)
-						ImGui.TextColored(ImGuiColors.DalamudYellow, points.ToString());
+						ImGui.TextColored(Config.ColorMaxSecondChancePoints, points.ToString());
 					else
 						ImGui.Text(points.ToString());
 				}
@@ -409,7 +409,7 @@ internal class MainWindow : Window, IDisposable {
 
 		ImGui.Text(Localization.Localize("gui.filter.content-type", "Type:"));
 
-		ImGui.PushStyleColor(ImGuiCol.ButtonActive, ImGuiColors.DalamudOrange);
+		ImGui.PushStyleColor(ImGuiCol.ButtonActive, Config.ColorButtonActive);
 		ImGui.PushStyleColor(ImGuiCol.ButtonHovered, ImGuiColors.DalamudGrey3);
 		ImGui.PushStyleColor(ImGuiCol.Button, 0);
 
@@ -419,8 +419,8 @@ internal class MainWindow : Window, IDisposable {
 			ImGui.SameLine();
 
 			if (state) {
-				ImGui.PushStyleColor(ImGuiCol.Button, ImGuiColors.DalamudOrange);
-				ImGui.PushStyleColor(ImGuiCol.ButtonHovered, ImGuiColors.DalamudOrange);
+				ImGui.PushStyleColor(ImGuiCol.Button, Config.ColorButtonActive);
+				ImGui.PushStyleColor(ImGuiCol.ButtonHovered, Config.ColorButtonActive);
 			}
 
 			// Left-click behavior: toggle entry
@@ -456,8 +456,8 @@ internal class MainWindow : Window, IDisposable {
 
 		bool filterNo = PartyState.FilterNoOpen;
 		if (filterNo) {
-			ImGui.PushStyleColor(ImGuiCol.Button, ImGuiColors.DalamudOrange);
-			ImGui.PushStyleColor(ImGuiCol.ButtonHovered, ImGuiColors.DalamudOrange);
+			ImGui.PushStyleColor(ImGuiCol.Button, Config.ColorButtonActive);
+			ImGui.PushStyleColor(ImGuiCol.ButtonHovered, Config.ColorButtonActive);
 		}
 
 		if (ImGuiComponents.IconButton(filterNo ? FontAwesomeIcon.FilterCircleXmark : FontAwesomeIcon.Filter)) {
@@ -492,8 +492,8 @@ internal class MainWindow : Window, IDisposable {
 			ImGui.SameLine();
 
 			if (state) {
-				ImGui.PushStyleColor(ImGuiCol.Button, ImGuiColors.DalamudOrange);
-				ImGui.PushStyleColor(ImGuiCol.ButtonHovered, ImGuiColors.DalamudOrange);
+				ImGui.PushStyleColor(ImGuiCol.Button, Config.ColorButtonActive);
+				ImGui.PushStyleColor(ImGuiCol.ButtonHovered, Config.ColorButtonActive);
 			}
 
 			// Left-click behavior: toggle entry
@@ -568,51 +568,61 @@ internal class MainWindow : Window, IDisposable {
 		string dividerText = ", ";
 		var dividerSize = ImGui.CalcTextSize(dividerText);
 
+		// TOOD: Figure out how to do a virtual list to reduce the impact or
+		// drawing a bunch of images that aren't within the visible scroll area.
 
 		foreach (var entry in PartyState.DisplayEntries) {
 
 			var pos = ImGui.GetCursorPos();
 
 			// First, the image for the entry.
-			var imgWrap = entry.Icon.GetWrapOrEmpty();
-			int width = (int) (imgWrap.Width * Plugin.Config.ImageScale);
-			int height = (int) (imgWrap.Height * Plugin.Config.ImageScale);
+			int width;
+			int height;
 
-			if (width > 0 && height > 0) {
-				ImGui.Image(imgWrap.ImGuiHandle, new Vector2(width, height));
+			if (Plugin.Config.ImageScale == 0) {
+				width = 0;
+				height = 0;
+			} else {
+				var imgWrap = entry.Icon.GetWrapOrEmpty();
+				width = (int) (imgWrap.Width * Plugin.Config.ImageScale);
+				height = (int) (imgWrap.Height * Plugin.Config.ImageScale);
 
-				// Behavior: If the user clicks / right-clicks the image, we should
-				// open the Duty Finder for them.
-				bool rightClicked = ImGui.IsItemClicked(ImGuiMouseButton.Right);
-				if (rightClicked || ImGui.IsItemClicked()) {
-					// Click Tracking
-					bool wasLastClicked = LastClickedThing == entry.Id;
-					LastClickedThing = (int) entry.Id;
-					got_click = true;
+				if (width > 0 && height > 0) {
+					ImGui.Image(imgWrap.ImGuiHandle, new Vector2(width, height));
 
-					if (entry.Data.Type == 3 && entry.Data.Data.Row == 6)
-						GameState.OpenRoulette(7); // Frontline
+					// Behavior: If the user clicks / right-clicks the image, we should
+					// open the Duty Finder for them.
+					bool rightClicked = ImGui.IsItemClicked(ImGuiMouseButton.Right);
+					if (rightClicked || ImGui.IsItemClicked()) {
+						// Click Tracking
+						bool wasLastClicked = LastClickedThing == entry.Id;
+						LastClickedThing = (int) entry.Id;
+						got_click = true;
 
-					else if (entry.Data.Type == 3 && entry.Data.Data.Row == 5)
-						GameState.OpenRoulette(40); // Crystalline Conflict
+						if (entry.Data.Type == 3 && entry.Data.Data.Row == 6)
+							GameState.OpenRoulette(7); // Frontline
 
-					else if (entry.Conditions.Count > 0) {
-						int direction = rightClicked ? -1 : 1;
-						ClickIndex = wasLastClicked ? ClickIndex + direction : 0;
-						if (ClickIndex < 0)
-							ClickIndex = entry.Conditions.Count - 1;
-						else
-							ClickIndex %= entry.Conditions.Count;
+						else if (entry.Data.Type == 3 && entry.Data.Data.Row == 5)
+							GameState.OpenRoulette(40); // Crystalline Conflict
 
-						GameState.OpenDutyFinder(entry.Conditions[ClickIndex]);
+						else if (entry.Conditions.Count > 0) {
+							int direction = rightClicked ? -1 : 1;
+							ClickIndex = wasLastClicked ? ClickIndex + direction : 0;
+							if (ClickIndex < 0)
+								ClickIndex = entry.Conditions.Count - 1;
+							else
+								ClickIndex %= entry.Conditions.Count;
+
+							GameState.OpenDutyFinder(entry.Conditions[ClickIndex]);
+						}
 					}
-				}
 
-				// Behavior: Display a list of matching duties when hovering over the image.
-				if (ImGui.IsItemHovered()) {
-					string? tip = entry.ToolTip;
-					if (!string.IsNullOrEmpty(tip))
-						ImGui.SetTooltip(tip);
+					// Behavior: Display a list of matching duties when hovering over the image.
+					if (ImGui.IsItemHovered()) {
+						string? tip = entry.ToolTip;
+						if (!string.IsNullOrEmpty(tip))
+							ImGui.SetTooltip(tip);
+					}
 				}
 			}
 
@@ -637,7 +647,7 @@ internal class MainWindow : Window, IDisposable {
 			else
 				label = $"Lv. {entry.MinLevel}-{entry.MaxLevel}";
 
-			ImGui.TextColored(ImGuiColors.ParsedBlue, label);
+			ImGui.TextColored(Config.ColorLevelLabel, label);
 
 
 			// Player entries.
@@ -681,7 +691,7 @@ internal class MainWindow : Window, IDisposable {
 
 				bool isOpen = member.Item3 == PlayerState.WeeklyBingoTaskStatus.Open;
 
-				ImGui.TextColored(isOpen ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudGrey, name);
+				ImGui.TextColored(isOpen ? Config.ColorDutyAvailable : ImGuiColors.DalamudGrey, name);
 				if (ImGui.IsItemHovered())
 					ImGui.SetTooltip(
 						(isOpen

@@ -128,35 +128,56 @@ public record BingoEntry {
 
 	public ISharedImmediateTexture Icon => Service.TextureProvider.GetFromGameIcon(new GameIconLookup(Data.Icon, hiRes: true));
 
+	private string? _DisplayName;
+
 	public string DisplayName {
 		get {
-			if (Data.Text.Row != 0 && Data.Text.Value is not null)
-				return Data.Text.Value.Description.ToString();
+			if (_DisplayName == null) {
+				if (Data.Text.Row != 0 && Data.Text.Value is not null)
+					_DisplayName = Data.Text.Value.Description.ToString();
 
-			if (Conditions.Count > 0)
-				return Conditions[0].Name.ToTitleCase();
+				else if (Conditions.Count > 0)
+					_DisplayName = Conditions[0].Name.ToTitleCase();
 
-			return Localization.Localize("gui.unknown-order", "Unknown ({id})").Replace("{id}", Id.ToString());
+				else
+					_DisplayName = Localization.Localize("gui.unknown-order", "Unknown ({id})").Replace("{id}", Id.ToString());
+			}
+
+			return _DisplayName;
 		}
 	}
+
+	private string? _ToolTip;
 
 	public string? ToolTip {
 		get {
 			if (Conditions.Count == 0)
 				return null;
 
-			bool showLevel = MinLevel != MaxLevel;
+			if (_ToolTip == null) {
+				bool showLevel = MinLevel != MaxLevel;
 
-			var conditionLines = showLevel
-				? Conditions.Select(x => {
-					uint lvl = x.ContentType.Row == 9 ? x.ClassJobLevelSync : x.ClassJobLevelRequired;
-					// TODO: Make this "Lv." translatable.
-					return $"{x.Name.ToTitleCase()} (Lv. {lvl})";
-				})
-				: Conditions.Select(x => x.Name.ToTitleCase());
+				var conditionLines = showLevel
+					? Conditions
+						.Select(x => {
+							uint lvl = x.ContentType.Row == 9 ? x.ClassJobLevelSync : x.ClassJobLevelRequired;
+							return (x.Name.ToTitleCase(), lvl);
+						})
+						.Where(x => !string.IsNullOrWhiteSpace(x.Item1))
+						.DistinctBy(x => x.Item1)
+						.Select(x => {
+							// TODO: Make this "Lv." translatable.
+							return $"{x.Item1} (Lv. {x.Item2})";
+						})
+					: Conditions
+						.Select(x => x.Name.ToTitleCase())
+						.Where(x => !string.IsNullOrWhiteSpace(x))
+						.Distinct();
 
-			return Localization.Localize("gui.matching-duties", "Matching Duties:") + "\n\n" + string.Join('\n', conditionLines);
+				_ToolTip = Localization.Localize("gui.matching-duties", "Matching Duties:") + "\n\n" + string.Join('\n', conditionLines);
+			}
 
+			return _ToolTip;
 		}
 	}
 

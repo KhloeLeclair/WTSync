@@ -32,8 +32,9 @@ public sealed class PartyMemberTracker : IDisposable {
 			return;
 		}
 
-		// We do not check party members in a duty, but we keep the cache.
-		if (GameState.IsInDuty)
+		// We do not check party members in a duty, but we keep the cache as long
+		// as we HAVE a cache.
+		if (GameState.IsInDuty && CachedMembers.Count > 0)
 			return;
 
 		// Check to see if the number of party members has changed.

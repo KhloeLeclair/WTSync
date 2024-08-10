@@ -1,11 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using System.Numerics;
 using System.Security.Cryptography;
 using System.Text;
 
 using Dalamud.Game.ClientState.Party;
 
+using FFXIVClientStructs.FFXIV.Client.Game.UI;
 using FFXIVClientStructs.FFXIV.Client.UI.Info;
 
 using Lumina.Excel.GeneratedSheets2;
@@ -16,6 +18,10 @@ using WTSync.Models;
 namespace WTSync;
 
 internal static class Helpers {
+
+	public static readonly Vector4 BLACK = new Vector4(0, 0, 0, 1f);
+	public static readonly Vector4 BAR_GREEN = new Vector4(0x00, 0xCC / 255f, 0x22 / 255f, 0xFF / 255f);
+	public static readonly Vector4 BAR_ORANGE = new Vector4(0xFF / 255f, 0x7B / 255f, 0x1A / 255f, 1f);
 
 	internal static string ToSha256(this string input) {
 		if (string.IsNullOrEmpty(input))
@@ -140,7 +146,7 @@ internal static class Helpers {
 		}
 	}
 
-	internal static WeeklyBingoOrderData? GetMatchingEntry(WTStatus status) {
+	internal static (WeeklyBingoOrderData, PlayerState.WeeklyBingoTaskStatus)? GetMatchingEntry(WTStatus status) {
 		var sheet = Service.DataManager.GetExcelSheet<WeeklyBingoOrderData>();
 		if (sheet == null)
 			return null;
@@ -155,7 +161,7 @@ internal static class Helpers {
 			var conds = GetConditionsForEntry(row);
 			foreach (var cond in conds) {
 				if (cond.TerritoryType.Row == current)
-					return row;
+					return (row, duty.Status);
 			}
 		}
 
@@ -209,6 +215,10 @@ internal static class Helpers {
 				// Special Instances
 				switch (entry.Data.Row) {
 					case 5: // Crystaline Conflict
+						foreach (var thing in sheet) {
+							if (thing.ContentType.Row == 6 && (thing.ContentMemberType.Row == 29 || thing.ContentMemberType.Row == 30))
+								conditions.Add(thing);
+						}
 						break;
 
 					case 6: // Frontline

@@ -9,13 +9,14 @@ using Dalamud.Game.Addon.Lifecycle.AddonArgTypes;
 using Dalamud.Game.Gui.Dtr;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin;
+using Dalamud.Utility;
 
 using FFXIVClientStructs.FFXIV.Client.Game;
 using FFXIVClientStructs.FFXIV.Client.Game.UI;
 using FFXIVClientStructs.FFXIV.Client.UI.Agent;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 
-using Lumina.Excel.GeneratedSheets2;
+using Lumina.Text;
 
 using WTSync.Models;
 using WTSync.UI;
@@ -191,7 +192,7 @@ public sealed class Plugin : IDalamudPlugin {
 			return null;
 
 		var members = PartyMemberTracker.Members;
-		var client = members.Count == 1 ? null : ServerClient.StartStatusFeed(members
+		var client = members.Count <= 1 ? null : ServerClient.StartStatusFeed(members
 			.Select(x => x.Id)
 			// We don't need to subscribe to our own WT state.
 			.Where(x => x != myId)
@@ -220,7 +221,7 @@ public sealed class Plugin : IDalamudPlugin {
 		if (BarStatus is null)
 			dtrEntry.Shown = false;
 		else {
-			WeeklyBingoOrderData? matchingDuty = GameState.IsInDuty
+			var matchingDuty = GameState.IsInDuty
 				? Helpers.GetMatchingEntry(BarStatus)
 				: null;
 
@@ -238,16 +239,59 @@ public sealed class Plugin : IDalamudPlugin {
 				.Replace("{stickers}", claimable.ToString())
 				.Replace("{points}", BarStatus.SecondChancePoints.ToInstanceNumber());
 
-			if (matchingDuty != null) {
+			if (matchingDuty.HasValue) {
+				var duty = matchingDuty.Value.Item1;
+				var status = matchingDuty.Value.Item2;
+
 				string extraTip;
-				if (matchingDuty.Text.Row == 0 || matchingDuty.Text.Value is null)
+				string warnTip = string.Empty;
+				if (duty.Text.Row == 0 || duty.Text.Value is null)
 					extraTip = Localization.Localize("gui.server-bar.tooltip.match", "This duty is in your Wondrous Tails.");
 				else
 					extraTip = Localization.Localize("gui.server-bar.tooltip.inexact", "This duty is in your Wondrous Tails as \"{name}\".")
-						.Replace("{name}", matchingDuty.Text.Value.Description.ToString());
+						.Replace("{name}", duty.Text.Value.Description.ToString());
 
-				dtrEntry.Tooltip += "\n\n" + extraTip;
-				dtrEntry.Text = $"\uE0BE {dtrEntry.Text}";
+				bool isOpen = status == PlayerState.WeeklyBingoTaskStatus.Open;
+				bool isClaimable = isOpen || BarStatus.SecondChancePoints > 0;
+
+				if (!isOpen) {
+					if (isClaimable)
+						warnTip += "\n\n" + Localization.Localize("gui.server-bar.tooltip.claimable", "You have already completed this duty. Use a Second Chance point to retry it if you want to earn another sticker.");
+					else
+						warnTip += "\n\n" + Localization.Localize("gui.server-bar.tooltip.unavialable", "You have already completed this duty and have no Second Chance points to retry it.");
+				}
+
+				var builder = new SeStringBuilder();
+
+				if (Config.BarColorMode > 0) {
+					if (isOpen)
+						builder
+							.PushColorRgba(Config.BarColorInDuty)
+							.PushEdgeColorRgba(Config.BarColorInDutyEdge);
+					else
+						builder
+							.PushColorRgba(Config.BarColorDutyClaimed)
+							.PushEdgeColorRgba(Config.BarColorDutyClaimedEdge);
+				}
+
+				builder.Append(isOpen ? "\uE0BE " : "\uE0BF ");
+
+				if (Config.BarColorMode == 1)
+					builder.PopColor().PopEdgeColor();
+
+				builder.Append(dtrEntry.Text);
+				dtrEntry.Text = builder.ToSeString().ToDalamudString();
+
+				dtrEntry.Tooltip = new SeStringBuilder()
+					.Append(dtrEntry.Tooltip)
+					.Append("\n\n")
+					.AppendSetItalic(true)
+					.Append(extraTip)
+					.AppendSetItalic(false)
+					.AppendSetBold(true)
+					.Append(warnTip)
+					.AppendSetBold(false)
+					.ToSeString().ToDalamudString();
 			}
 
 			dtrEntry.Shown = true;
