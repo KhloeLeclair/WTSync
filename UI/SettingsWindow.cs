@@ -214,8 +214,13 @@ internal class SettingsWindow : Window {
 		var resetSize = ImGui.CalcTextSize(resetLabel);
 		var style = ImGui.GetStyle();
 
-		float pickerX = ImGui.GetWindowContentRegionMax().X - (32 + resetSize.X + style.WindowPadding.X + style.FramePadding.X);
-		float resetX = ImGui.GetWindowContentRegionMax().X - (resetSize.X + style.WindowPadding.X);
+		float resetWidth = resetSize.X + (style.FramePadding.X * 2f);
+
+		float btnSize = ImGui.GetFrameHeight();
+		float rightSide = ImGui.GetWindowContentRegionMax().X; // - style.WindowPadding.X;
+
+		float pickerX = rightSide - (btnSize + resetWidth + style.ItemSpacing.X);
+		float resetX = rightSide - resetWidth;
 
 		ImGui.Text(label);
 

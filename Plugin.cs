@@ -158,7 +158,7 @@ public sealed class Plugin : IDalamudPlugin {
 
 	#region Server Communication
 
-	public void SendServerUpdate() {
+	public void SendServerUpdate(bool forceUpdate = false) {
 		string? myId = GameState.LocalPlayerId;
 		if (myId == null || !Service.ClientState.IsLoggedIn)
 			return;
@@ -172,7 +172,8 @@ public sealed class Plugin : IDalamudPlugin {
 		};
 
 		// Check to see if this changed.
-		bool do_update = !PreviousStatus.TryGetValue(result.Id, out var previous) ||
+		bool do_update = forceUpdate ||
+			!PreviousStatus.TryGetValue(result.Id, out var previous) ||
 			!EqualityComparer<WTStatus>.Default.Equals(previous, result.Status);
 
 		// Server Update

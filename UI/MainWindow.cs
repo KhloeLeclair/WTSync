@@ -277,6 +277,8 @@ internal class MainWindow : Window, IDisposable {
 
 		UpdateFlags();
 
+		var style = ImGui.GetStyle();
+
 		bool isSolo = PartyState != null && PartyState.PlayerNames.Count <= 1;
 
 		if (isSolo) {
@@ -306,9 +308,42 @@ internal class MainWindow : Window, IDisposable {
 				);
 		}
 
-		ImGui.SameLine(ImGui.GetWindowContentRegionMax().X - 32);
+		float rightSide = ImGui.GetWindowContentRegionMax().X;
+		float btnWidth = ImGui.GetFrameHeight();
 
-		ImGui.PushID($"opensettings");
+		ImGui.SameLine(rightSide - btnWidth - btnWidth - style.ItemSpacing.X);
+
+		bool isUpdating = Plugin.ServerClient.HasPendingUpdate;
+		string? updateError = Plugin.ServerClient.LastError;
+		bool isError = updateError is not null;
+
+		ImGui.PushID("sync-button");
+
+		if (ImGuiComponents.IconButton(isError
+			? FontAwesomeIcon.ExclamationTriangle
+			: isUpdating
+				? FontAwesomeIcon.Sync
+				: FontAwesomeIcon.Upload
+			) && !isUpdating
+		)
+			Plugin.SendServerUpdate(true);
+
+		if (ImGui.IsItemHovered()) {
+			string tip = isUpdating
+				? Localization.Localize("gui.force-sync.updating", "Your status is being uploaded to the server. Please wait a few seconds.")
+				: Localization.Localize("gui.force-sync.about", "Click this button to re-submit your status to the server.\n\nYou should only need to use this if your party members\ndon't see your Wondrous Tails data correctly for some reason.");
+
+			if (Plugin.ServerClient.LastError != null)
+				tip += "\n\n" + Localization.Localize("gui.force-sync.error", "There was an error uploading your status to the server.\nWe will try again.\n\nError:") + "\n" + Plugin.ServerClient.LastError;
+
+			ImGui.SetTooltip(tip);
+		}
+
+		ImGui.PopID();
+
+		ImGui.SameLine(rightSide - btnWidth);
+
+		ImGui.PushID("opensettings");
 		if (ImGuiComponents.IconButton(FontAwesomeIcon.Cog))
 			Plugin.OnOpenConfig();
 		if (ImGui.IsItemHovered())
@@ -451,7 +486,7 @@ internal class MainWindow : Window, IDisposable {
 		ImGui.PopStyleColor();
 		ImGui.PopStyleColor();
 
-		ImGui.SameLine(ImGui.GetWindowContentRegionMax().X - 32);
+		ImGui.SameLine(rightSide - btnWidth);
 		ImGui.PushID($"filternoopen");
 
 		bool filterNo = PartyState.FilterNoOpen;
@@ -562,7 +597,6 @@ internal class MainWindow : Window, IDisposable {
 		// TODO: Re-factor to support multiple columns
 
 		var windowSize = ImGui.GetContentRegionMax();
-		var style = ImGui.GetStyle();
 		var spaceSize = ImGui.CalcTextSize(" ");
 
 		string dividerText = ", ";

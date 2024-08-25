@@ -62,6 +62,7 @@ internal static class GameState {
 			return Service.Condition.Any(
 				ConditionFlag.BetweenAreas,
 				ConditionFlag.BetweenAreas51,
+				ConditionFlag.Mounted2, // Riding someone else's mount
 				ConditionFlag.Occupied,
 				ConditionFlag.Occupied30,
 				ConditionFlag.Occupied33,

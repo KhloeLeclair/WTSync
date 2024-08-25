@@ -29,6 +29,14 @@ internal class ServerClient : IDisposable {
 
 	internal string Version;
 
+	public bool HasPendingUpdate => UploadTask is not null;
+
+	private string? _LastError;
+
+	public string? LastError => _LastError;
+
+	public bool HasError => LastError is not null;
+
 	internal ServerClient(Plugin plugin) {
 		Plugin = plugin;
 		Client = new HttpClient();
@@ -111,13 +119,15 @@ internal class ServerClient : IDisposable {
 				if (!response.IsSuccessStatusCode) {
 					string state = await response.Content.ReadAsStringAsync();
 					Service.Logger.Error($"Error submitting state to server: {state}");
+					_LastError = state;
 
 					if (response.StatusCode == System.Net.HttpStatusCode.InternalServerError)
 						lock (PendingStatus) {
 							if (!PendingStatus.ContainsKey(entry.Id))
 								PendingStatus[entry.Id] = entry.Status;
 						}
-				}
+				} else
+					_LastError = null;
 
 			} catch (Exception ex) {
 				Service.Logger.Error($"Error submitting state to server: {ex}");
