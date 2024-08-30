@@ -1,7 +1,10 @@
 // Ignore Spelling: Plugin
 
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 
 using Dalamud;
 using Dalamud.Game.Addon.Lifecycle;
@@ -46,6 +49,9 @@ public sealed class Plugin : IDalamudPlugin {
 	internal PartyMemberTracker PartyMemberTracker { get; private set; }
 
 	internal Dictionary<string, WTStatus?> PreviousStatus { get; init; } = [];
+
+	private Task? IdyllshirePollTask;
+	private CancellationTokenSource? IdyllshireCancelToken;
 
 	#region Life Cycle
 
@@ -99,7 +105,7 @@ public sealed class Plugin : IDalamudPlugin {
 			// Update the state and open the window now.
 			MainWindow.MaybeOpenAtLoad();
 			if (Service.ClientState.IsLoggedIn)
-				SendServerUpdate();
+				Service.Framework.RunOnFrameworkThread(() => SendServerUpdate());
 		}
 	}
 
@@ -135,6 +141,18 @@ public sealed class Plugin : IDalamudPlugin {
 		Service.Interface.UiBuilder.Draw -= OnDraw;
 		Service.Interface.UiBuilder.OpenConfigUi -= OnOpenConfig;
 		Service.Interface.UiBuilder.OpenMainUi -= OnOpenMain;
+
+		IdyllshireCancelToken?.Cancel();
+
+		try {
+			IdyllshireCancelToken?.Dispose();
+			IdyllshirePollTask?.Dispose();
+		} catch (Exception ex) {
+			Service.Logger.Warning($"Unable to dispose of Idyllshire poll task: {ex}");
+		}
+
+		IdyllshirePollTask = null;
+		IdyllshireCancelToken = null;
 
 		Service.AddonLifecycle.UnregisterListener(AddonEvent.PostRefresh, "WeeklyBingo", OnRefreshBingo);
 
@@ -185,6 +203,10 @@ public sealed class Plugin : IDalamudPlugin {
 
 		// And finally, make sure the UI is up to date.
 		UpdateBarStatus(result.Status);
+
+		// Bonus!
+		if (GameState.IsInIdyllshire)
+			MaybeFireIdyllshireTask();
 	}
 
 	public (SyncSocketClient?, PartyBingoState)? GetPartyDutyFeed() {
@@ -234,6 +256,12 @@ public sealed class Plugin : IDalamudPlugin {
 
 			if (claimable > 9)
 				claimable = 9;
+
+			// Do not show if there's no need to show.
+			if (GameState.IsInDuty && Config.HideBarIfNoSticker && (matchingDuty == null || claimable >= 9)) {
+				dtrEntry.Shown = false;
+				return;
+			}
 
 			dtrEntry.Tooltip = Localization.Localize("gui.server-bar.tooltip", "Wondrous Tails Completion");
 			dtrEntry.Text = Localization.Localize("gui.server-bar.info", "WT: {stickers} / 9  {points}")
@@ -303,6 +331,15 @@ public sealed class Plugin : IDalamudPlugin {
 	#endregion
 
 	#region Events
+
+	private void MaybeFireIdyllshireTask() {
+		IdyllshireCancelToken ??= new();
+		IdyllshirePollTask ??= Service.Framework.RunOnTick(() => {
+			IdyllshirePollTask = null;
+			SendServerUpdate();
+		}, new TimeSpan(0, 0, 10), cancellationToken: IdyllshireCancelToken.Token);
+	}
+
 
 	private void OnRefreshBingo(AddonEvent type, AddonArgs args) {
 		SendServerUpdate();

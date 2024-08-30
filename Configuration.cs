@@ -27,6 +27,8 @@ public class Configuration : IPluginConfiguration {
 
 	// Server Bar
 
+	public bool HideBarIfNoSticker { get; set; } = true;
+
 	public int BarColorMode { get; set; } = 0;
 
 	public Vector4 BarColorInDuty { get; set; } = Helpers.BAR_GREEN;

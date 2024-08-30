@@ -161,6 +161,16 @@ internal class SettingsWindow : Window {
 
 			ImGui.Spacing();
 
+			bool hide_thing = Config.HideBarIfNoSticker;
+			if (ImGui.Checkbox(Localization.Localize("gui.settings.bar.hide-no-sticker", "Hide if in non-matching duty."), ref hide_thing)) {
+				Config.HideBarIfNoSticker = hide_thing;
+				Config.Save();
+				Plugin.UpdateBar();
+			}
+
+			if (ImGui.IsItemHovered())
+				ImGui.SetTooltip(Localization.Localize("gui.settings.bar.hide-no-sticker.about", "If this is enabled, the WTSync server info bar entry will not be displayed\nif you're in a duty and the duty isn't in your Wondrous Tails,\nor if you're already at nine stickers."));
+
 			int colorMode = Config.BarColorMode;
 			if (ImGui.Combo(Localization.Localize("gui.setting.bar-color", "In Duty Color Mode"), ref colorMode, BarColorModes, BarColorModes.Length)) {
 				Config.BarColorMode = colorMode;
