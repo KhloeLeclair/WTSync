@@ -47,6 +47,27 @@ internal class SettingsWindow : Window {
 
 	public override void Draw() {
 
+		DrawBasicSettings();
+
+		ImGui.Spacing();
+
+		DrawCustomizeWindowSettings();
+
+		//DrawCustomSortingSettings();
+
+	}
+
+	public void DrawCustomSortingSettings() {
+
+		if (!ImGui.CollapsingHeader(Localization.Localize("gui.settings.sorting", "Sorting Methods")))
+			return;
+
+		ImGui.TextWrapped(Localization.Localize("gui.settings.sorting.about", ""));
+
+
+	}
+
+	public void DrawBasicSettings() {
 
 		bool openWith = Config.OpenWithWT;
 		if (ImGui.Checkbox(Localization.Localize("gui.setting.open-with", "Open with Wondrous Tails"), ref openWith)) {
@@ -71,7 +92,17 @@ internal class SettingsWindow : Window {
 
 		ImGui.Unindent();
 
-		ImGui.Spacing();
+		bool randomDuty = Config.RandomDutyOnClick;
+		if (ImGui.Checkbox(Localization.Localize("gui.settings.random-duty", "Select Random Duty on Click"), ref randomDuty)) {
+			Config.RandomDutyOnClick = randomDuty;
+			Config.Save();
+		}
+
+		if (ImGui.IsItemHovered())
+			ImGui.SetTooltip(Localization.Localize("gui.setting.random-duty.tip", "When this is enabled, clicking an entry's picture or title will select a random matching duty in Duty Finder rather than cycling through them."));
+	}
+
+	public void DrawCustomizeWindowSettings() {
 
 		if (ImGui.CollapsingHeader(Localization.Localize("gui.settings.main-window", "Customize Main Window"), ImGuiTreeNodeFlags.DefaultOpen)) {
 			bool showExpiration = Config.ShowExpiration;

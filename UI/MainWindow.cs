@@ -269,6 +269,18 @@ internal class MainWindow : Window, IDisposable {
 		var data = Plugin.GetPartyDutyFeed();
 		if (data != null)
 			(SyncSocketClient, PartyState) = data.Value;
+
+		UpdateSorter();
+	}
+
+	public void UpdateSorter() {
+		if (PartyState == null)
+			return;
+
+		if (Config.LastSort >= 0 && Config.LastSort < Config.CustomSorts.Count)
+			PartyState.Sorter = EntrySorter.BuildSorter(Config.CustomSorts[Config.LastSort].Entries);
+		else
+			PartyState.Sorter = EntrySorter.DefaultComparison;
 	}
 
 
@@ -280,6 +292,7 @@ internal class MainWindow : Window, IDisposable {
 		var style = ImGui.GetStyle();
 
 		bool isSolo = PartyState != null && PartyState.PlayerNames.Count <= 1;
+		bool isBusted = PartyState != null && PartyState.PlayerNames.Count <= 0;
 
 		if (isSolo) {
 			ImGui.TextColored(ImGuiColors.DalamudGrey, Localization.Localize("gui.load-state.offline", "Offline"));
@@ -351,6 +364,12 @@ internal class MainWindow : Window, IDisposable {
 		ImGui.PopID();
 
 		if (PartyState == null) {
+			ImGui.Spacing();
+			ImGui.Spacing();
+			ImGui.Spacing();
+
+			ImGui.TextWrapped(Localization.Localize("gui.no-state", "Somehow, we don't know what state your party is in.\n\nSomething probably went wrong."));
+
 			if (ImGui.IsAnyMouseDown() && !got_click)
 				LastClickedThing = 0;
 
@@ -592,6 +611,46 @@ internal class MainWindow : Window, IDisposable {
 
 		ImGui.PopStyleColor();
 
+		// Sorting
+
+		if (Config.CustomSorts.Count > 0) {
+			var sortMethod = Config.LastSort >= 0 && Config.LastSort < Config.CustomSorts.Count
+				? Config.CustomSorts[Config.LastSort] : null;
+
+			string currentName = CustomSort.GetName(sortMethod);
+
+			if (ImGui.BeginCombo(Localization.Localize("gui.sort", "Sort"), currentName)) {
+
+				bool selected = Config.LastSort == -1;
+
+				if (ImGui.Selectable(Localization.Localize("sort.default", "Default"), selected)) {
+					Config.LastSort = -1;
+					Config.Save();
+					UpdateSorter();
+				}
+
+				if (selected)
+					ImGui.SetItemDefaultFocus();
+
+				for (int i = 0; i < Config.CustomSorts.Count; i++) {
+					var item = Config.CustomSorts[i];
+					selected = Config.LastSort == i;
+
+					if (ImGui.Selectable(item.GetName(), selected)) {
+						Config.LastSort = i;
+						Config.Save();
+						UpdateSorter();
+					}
+
+					if (selected)
+						ImGui.SetItemDefaultFocus();
+				}
+
+				ImGui.EndCombo();
+			}
+		}
+
+
 		// Rendering the List
 
 		// TODO: Re-factor to support multiple columns
@@ -613,6 +672,8 @@ internal class MainWindow : Window, IDisposable {
 			int width;
 			int height;
 
+			bool rightClicked;
+
 			if (Plugin.Config.ImageScale == 0) {
 				width = 0;
 				height = 0;
@@ -626,29 +687,10 @@ internal class MainWindow : Window, IDisposable {
 
 					// Behavior: If the user clicks / right-clicks the image, we should
 					// open the Duty Finder for them.
-					bool rightClicked = ImGui.IsItemClicked(ImGuiMouseButton.Right);
+					rightClicked = ImGui.IsItemClicked(ImGuiMouseButton.Right);
 					if (rightClicked || ImGui.IsItemClicked()) {
-						// Click Tracking
-						bool wasLastClicked = LastClickedThing == entry.Id;
-						LastClickedThing = (int) entry.Id;
+						OnClickEntry(entry, rightClicked);
 						got_click = true;
-
-						if (entry.Data.Type == 3 && entry.Data.Data.Row == 6)
-							GameState.OpenRoulette(7); // Frontline
-
-						else if (entry.Data.Type == 3 && entry.Data.Data.Row == 5)
-							GameState.OpenRoulette(40); // Crystalline Conflict
-
-						else if (entry.Conditions.Count > 0) {
-							int direction = rightClicked ? -1 : 1;
-							ClickIndex = wasLastClicked ? ClickIndex + direction : 0;
-							if (ClickIndex < 0)
-								ClickIndex = entry.Conditions.Count - 1;
-							else
-								ClickIndex %= entry.Conditions.Count;
-
-							GameState.OpenDutyFinder(entry.Conditions[ClickIndex]);
-						}
 					}
 
 					// Behavior: Display a list of matching duties when hovering over the image.
@@ -671,6 +713,13 @@ internal class MainWindow : Window, IDisposable {
 			string label = entry.DisplayName;
 			ImGui.Text(label);
 
+			// Entry click reactivity (continued)
+			rightClicked = ImGui.IsItemClicked(ImGuiMouseButton.Right);
+			if (rightClicked || ImGui.IsItemClicked()) {
+				OnClickEntry(entry, rightClicked);
+				got_click = true;
+			}
+
 			// Level Label
 			var labelSize = ImGui.CalcTextSize(label);
 
@@ -682,6 +731,13 @@ internal class MainWindow : Window, IDisposable {
 				label = $"Lv. {entry.MinLevel}-{entry.MaxLevel}";
 
 			ImGui.TextColored(Config.ColorLevelLabel, label);
+
+			// Entry click reactivity (continued)
+			rightClicked = ImGui.IsItemClicked(ImGuiMouseButton.Right);
+			if (rightClicked || ImGui.IsItemClicked()) {
+				OnClickEntry(entry, rightClicked);
+				got_click = true;
+			}
 
 
 			// Player entries.
@@ -752,4 +808,40 @@ internal class MainWindow : Window, IDisposable {
 			LastClickedThing = 0;
 		}
 	}
+
+	void OnClickEntry(BingoEntry entry, bool rightClicked = false) {
+		// Click Tracking
+		bool wasLastClicked = LastClickedThing == entry.Id;
+		LastClickedThing = (int) entry.Id;
+
+		if (entry.Data.Type == 3 && entry.Data.Data.RowId == 6)
+			// Frontlines
+			GameState.OpenRoulette(7);
+
+		else if (entry.Data.Type == 3 && entry.Data.Data.RowId == 5)
+			// Crystalline Conflict
+			GameState.OpenRoulette(40);
+
+		else if (Config.RandomDutyOnClick && entry.Conditions.Count > 1) {
+			// Random Duty
+			int old = ClickIndex;
+			int i = 0;
+			while (i++ < 5 && ClickIndex == old)
+				ClickIndex = Random.Shared.Next(0, entry.Conditions.Count);
+
+			GameState.OpenDutyFinder(entry.Conditions[ClickIndex]);
+
+		} else if (entry.Conditions.Count > 0) {
+			// Cycle Duties
+			int direction = rightClicked ? -1 : 1;
+			ClickIndex = wasLastClicked ? ClickIndex + direction : 0;
+			if (ClickIndex < 0)
+				ClickIndex = entry.Conditions.Count - 1;
+			else
+				ClickIndex %= entry.Conditions.Count;
+
+			GameState.OpenDutyFinder(entry.Conditions[ClickIndex]);
+		}
+	}
+
 }

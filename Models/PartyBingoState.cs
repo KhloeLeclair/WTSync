@@ -1,9 +1,10 @@
+using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 
 using FFXIVClientStructs.FFXIV.Client.Game.UI;
 
-using Lumina.Excel.GeneratedSheets2;
+using Lumina.Excel.Sheets;
 
 namespace WTSync.Models;
 
@@ -54,6 +55,20 @@ public class PartyBingoState {
 	}
 
 	private List<BingoEntry>? _CachedDisplayEntries;
+
+	#region Sorter
+
+	private static Comparison<BingoEntry>? _Sorter;
+
+	public Comparison<BingoEntry> Sorter {
+		get => _Sorter ?? EntrySorter.DefaultComparison;
+		set {
+			_Sorter = value;
+			_CachedDisplayEntries = null;
+		}
+	}
+
+	#endregion
 
 	#region Filter Data
 
@@ -175,8 +190,7 @@ public class PartyBingoState {
 
 		// Now, create the actual entries.
 		foreach (var entry in Orders) {
-			var row = sheet.GetRow(entry.Key);
-			if (row == null)
+			if (!sheet.TryGetRow(entry.Key, out var row))
 				continue;
 
 			var thing = new BingoEntry(entry.Key, row, entry.Value, PlayerNames, Stickers);
@@ -286,36 +300,8 @@ public class PartyBingoState {
 			}
 		}
 
-		// TODO: Customizable sorting.
-		_CachedDisplayEntries.Sort((a, b) => {
-			int aPlayers = a.PlayersOpen.Count;
-			int bPlayers = b.PlayersOpen.Count;
-
-			// First, sort by the number of players with the duty open (descending)
-			if (aPlayers != bPlayers)
-				return bPlayers.CompareTo(aPlayers);
-
-			// Next, sort by minimum level (ascending) if there were players.
-			if (aPlayers > 0) {
-				if (a.MinLevel != b.MinLevel)
-					return a.MinLevel.CompareTo(b.MinLevel);
-			}
-
-			// Third, sort by total number of players (descending)
-			aPlayers += a.PlayersClaimable.Count + a.PlayersClaimed.Count;
-			bPlayers += b.PlayersClaimable.Count + b.PlayersClaimed.Count;
-
-			if (aPlayers != bPlayers)
-				return bPlayers.CompareTo(aPlayers);
-
-			// Next, sort by minimum level (ascending) without a player check
-			if (a.MinLevel != b.MinLevel)
-				return a.MinLevel.CompareTo(b.MinLevel);
-
-			// Finally, sort by name (ascending)
-			return a.DisplayName.CompareTo(b.DisplayName);
-		});
-
+		// Use our sorter.
+		_CachedDisplayEntries.Sort(Sorter);
 	}
 
 	#endregion

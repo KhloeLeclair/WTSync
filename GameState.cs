@@ -8,7 +8,7 @@ using FFXIVClientStructs.FFXIV.Client.Game.UI;
 using FFXIVClientStructs.FFXIV.Client.UI.Agent;
 using FFXIVClientStructs.FFXIV.Client.UI.Info;
 
-using Lumina.Excel.GeneratedSheets2;
+using Lumina.Excel.Sheets;
 
 using WTSync.Models;
 
@@ -101,7 +101,7 @@ internal static class GameState {
 				if (player == null)
 					_LocalPlayerId = null;
 				else
-					_LocalPlayerId = $"{player.Name}@{player.HomeWorld.Id}".ToSha256();
+					_LocalPlayerId = $"{player.Name}@{player.HomeWorld.RowId}".ToSha256();
 			}
 
 			return _LocalPlayerId;
@@ -143,13 +143,13 @@ internal static class GameState {
 			if (!group->IsAlliance && !group->IsSmallGroupAlliance)
 				for (int i = 0; i < group->MemberCount; i++) {
 					var member = group->PartyMembers[i];
-					if (member.ContentId > 0)
-						result.Add(new(member.NameString, member.ToId()));
+					if (member.ContentId > 0 && member.ToId() is string mid)
+						result.Add(new(member.NameString, mid));
 				}
 		}
 
-		if (result.Count == 0 && Service.ClientState.LocalPlayer != null && Service.ClientState.LocalContentId > 0)
-			result.Add(new(Service.ClientState.LocalPlayer.Name.ToString(), GameState.LocalPlayerId!));
+		if (result.Count == 0 && Service.ClientState.LocalPlayer != null && Service.ClientState.LocalContentId > 0 && GameState.LocalPlayerId is string lpid)
+			result.Add(new(Service.ClientState.LocalPlayer.Name.ToString(), lpid));
 
 		return result;
 	}
@@ -187,8 +187,8 @@ internal static class GameState {
 		var group = inst->CrossRealmGroups[idx];
 		for (int i = 0; i < group.GroupMemberCount; i++) {
 			var member = group.GroupMembers[i];
-			if (member.ContentId > 0)
-				result.Add(new(member.NameString, member.ToId()));
+			if (member.ContentId > 0 && member.ToId() is string mid)
+				result.Add(new(member.NameString, mid));
 		}
 
 		return result;
@@ -217,11 +217,15 @@ internal static class GameState {
 			byte orderId = inst->WeeklyBingoOrderData[i];
 			var status = inst->GetWeeklyBingoTaskStatus(i);
 
+			Service.Logger.Debug($"Duty {i}: {orderId} -- {status}");
+
 			Duties[i] = new() {
 				Id = orderId,
 				Status = status,
 			};
 		}
+
+		Service.Logger.Debug($"Expires: {inst->WeeklyBingoExpireDateTime}, Stickers: {inst->WeeklyBingoNumPlacedStickers}, Points: {inst->WeeklyBingoNumSecondChancePoints}");
 
 		return new WTStatus() {
 			Expires = inst->WeeklyBingoExpireDateTime,
@@ -237,7 +241,7 @@ internal static class GameState {
 		if (inst is null || GameState.IsInDuty) return;
 
 		// Don't open DF for treasure maps / deep dungeons
-		if (condition.ContentType.Row == 9 || condition.ContentType.Row == 21)
+		if (condition.ContentType.RowId == 9 || condition.ContentType.RowId == 21)
 			return;
 
 		if (!GameState.IsInQueue) {

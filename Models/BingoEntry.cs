@@ -6,7 +6,7 @@ using Dalamud.Interface.Textures;
 
 using FFXIVClientStructs.FFXIV.Client.Game.UI;
 
-using Lumina.Excel.GeneratedSheets2;
+using Lumina.Excel.Sheets;
 
 namespace WTSync.Models;
 
@@ -74,15 +74,17 @@ public record BingoEntry {
 		ContentTypes = [];
 
 		foreach (var condition in Conditions) {
-			uint lvl = condition.ContentType.Row == 9 ? condition.ClassJobLevelSync : condition.ClassJobLevelRequired;
+			uint lvl = condition.ContentType.RowId == 9 ? condition.ClassJobLevelSync : condition.ClassJobLevelRequired;
 			if (lvl < min)
 				min = lvl;
 			if (lvl > max)
 				max = lvl;
 
-			var ctype = condition.ContentType.Value;
-			if (ctype != null && !ContentTypes.Contains(ctype))
-				ContentTypes.Add(ctype);
+			if (condition.ContentType.IsValid) {
+				var ctype = condition.ContentType.Value;
+				if (!ContentTypes.Contains(condition.ContentType.Value))
+					ContentTypes.Add(ctype);
+			}
 		}
 
 		MinLevel = min;
@@ -133,7 +135,7 @@ public record BingoEntry {
 	public string DisplayName {
 		get {
 			if (_DisplayName == null) {
-				if (Data.Text.Row != 0 && Data.Text.Value is not null)
+				if (Data.Text.RowId != 0 && Data.Text.IsValid)
 					_DisplayName = Data.Text.Value.Description.ToString();
 
 				else if (Conditions.Count > 0)
@@ -160,7 +162,7 @@ public record BingoEntry {
 				var conditionLines = showLevel
 					? Conditions
 						.Select(x => {
-							uint lvl = x.ContentType.Row == 9 ? x.ClassJobLevelSync : x.ClassJobLevelRequired;
+							uint lvl = x.ContentType.RowId == 9 ? x.ClassJobLevelSync : x.ClassJobLevelRequired;
 							return (x.Name.ToTitleCase(), lvl);
 						})
 						.Where(x => !string.IsNullOrWhiteSpace(x.Item1))

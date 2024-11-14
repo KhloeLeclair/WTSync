@@ -64,6 +64,22 @@ public sealed class Plugin : IDalamudPlugin {
 
 		Config = pluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
 
+		Config.CustomSorts.Clear();
+		/*Config.CustomSorts.Add(new() {
+			Name = "Min Level ASC",
+			Entries = new() {
+				new("min-level", false),
+				new("name", false)
+			}
+		});
+		Config.CustomSorts.Add(new() {
+			Name = "Min Level DESC",
+			Entries = new() {
+				new("min-level", true),
+				new("name", true)
+			}
+		});*/
+
 		// Client Stuff
 		PartyMemberTracker = new();
 		ServerClient = new(this);
@@ -266,7 +282,9 @@ public sealed class Plugin : IDalamudPlugin {
 			dtrEntry.Tooltip = Localization.Localize("gui.server-bar.tooltip", "Wondrous Tails Completion");
 			dtrEntry.Text = Localization.Localize("gui.server-bar.info", "WT: {stickers} / 9  {points}")
 				.Replace("{stickers}", claimable.ToString())
-				.Replace("{points}", BarStatus.SecondChancePoints.ToInstanceNumber());
+				.Replace("{points}", BarStatus.SecondChancePoints == 0
+					? BarStatus.SecondChancePoints.ToBoxedNumber()
+					: BarStatus.SecondChancePoints.ToInstanceNumber());
 
 			if (matchingDuty.HasValue) {
 				var duty = matchingDuty.Value.Item1;
@@ -274,7 +292,7 @@ public sealed class Plugin : IDalamudPlugin {
 
 				string extraTip;
 				string warnTip = string.Empty;
-				if (duty.Text.Row == 0 || duty.Text.Value is null)
+				if (! duty.Text.IsValid)
 					extraTip = Localization.Localize("gui.server-bar.tooltip.match", "This duty is in your Wondrous Tails.");
 				else
 					extraTip = Localization.Localize("gui.server-bar.tooltip.inexact", "This duty is in your Wondrous Tails as \"{name}\".")
@@ -345,7 +363,7 @@ public sealed class Plugin : IDalamudPlugin {
 		SendServerUpdate();
 	}
 
-	private void OnLogout() {
+	private void OnLogout(int type, int code) {
 		ServerClient.HandleLogout(PreviousStatus.Keys);
 		PreviousStatus.Clear();
 	}

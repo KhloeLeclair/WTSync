@@ -10,8 +10,9 @@ using Dalamud.Game.ClientState.Party;
 using FFXIVClientStructs.FFXIV.Client.Game.UI;
 using FFXIVClientStructs.FFXIV.Client.UI.Info;
 
-using Lumina.Excel.GeneratedSheets2;
+using Lumina.Excel.Sheets;
 using Lumina.Text;
+using Lumina.Text.ReadOnly;
 
 using WTSync.Models;
 
@@ -23,25 +24,36 @@ internal static class Helpers {
 	public static readonly Vector4 BAR_GREEN = new Vector4(0x00, 0xCC / 255f, 0x22 / 255f, 0xFF / 255f);
 	public static readonly Vector4 BAR_ORANGE = new Vector4(0xFF / 255f, 0x7B / 255f, 0x1A / 255f, 1f);
 
-	internal static string ToSha256(this string input) {
+	private static bool HasLoggedAVE;
+
+	internal static string? ToSha256(this string input) {
 		if (string.IsNullOrEmpty(input))
 			return string.Empty;
 
-		byte[] buffer = Encoding.UTF8.GetBytes(input);
-		byte[] digest = SHA256.HashData(buffer);
+		try {
+			byte[] buffer = Encoding.UTF8.GetBytes(input);
+			byte[] digest = SHA256.HashData(buffer);
+			return Convert.ToHexString(digest);
 
-		return BitConverter.ToString(digest).Replace("-", string.Empty);
+		} catch(AccessViolationException ex) {
+			if (!HasLoggedAVE) {
+				Service.Logger.Error($"There was an error while trying to hash a string. Details:\n{ex}");
+				HasLoggedAVE = true;
+			}
+
+			return null;
+		}
 	}
 
-	internal static string ToId(this FFXIVClientStructs.FFXIV.Client.Game.Group.PartyMember member) {
+	internal static string? ToId(this FFXIVClientStructs.FFXIV.Client.Game.Group.PartyMember member) {
 		return $"{member.NameString}@{member.HomeWorld}".ToSha256();
 	}
 
-	internal static string ToId(this IPartyMember member) {
-		return $"{member.Name}@{member.World.Id}".ToSha256();
+	internal static string? ToId(this IPartyMember member) {
+		return $"{member.Name}@{member.World.RowId}".ToSha256();
 	}
 
-	internal static string ToId(this CrossRealmMember member) {
+	internal static string? ToId(this CrossRealmMember member) {
 		return $"{member.NameString}@{member.HomeWorld}".ToSha256();
 	}
 
@@ -98,6 +110,10 @@ internal static class Helpers {
 		return input.ToString().ToTitleCase();
 	}
 
+	internal static string ToTitleCase(this ReadOnlySeString input) {
+		return input.ToString().ToTitleCase();
+	}
+
 	internal static string ToTitleCase(this Dalamud.Game.Text.SeStringHandling.SeString input) {
 		return input.ToString().ToTitleCase();
 	}
@@ -109,6 +125,7 @@ internal static class Helpers {
 	private static List<ContentFinderCondition>? Dungeons { get; set; }
 	private static List<ContentFinderCondition>? Alliances { get; set; }
 	private static List<ContentFinderCondition>? Raids { get; set; }
+	private static List<ContentFinderCondition>? Trials { get; set; }
 
 	private static Dictionary<uint, ContentFinderCondition>? ConditionByInstance { get; set; }
 
@@ -116,33 +133,38 @@ internal static class Helpers {
 	[MemberNotNull(nameof(Dungeons))]
 	[MemberNotNull(nameof(Alliances))]
 	[MemberNotNull(nameof(Raids))]
+	[MemberNotNull(nameof(Trials))]
 	private static void LoadConditionsByInstance() {
-		if (ConditionByInstance != null && Dungeons != null && Alliances != null && Raids != null)
+		if (ConditionByInstance != null && Dungeons != null && Alliances != null && Raids != null && Trials != null)
 			return;
 
 		ConditionByInstance = [];
 		Dungeons = [];
 		Alliances = [];
 		Raids = [];
+		Trials = [];
 
 		var conditionSheet = Service.DataManager.GetExcelSheet<ContentFinderCondition>();
 		if (conditionSheet == null)
 			return;
 
 		foreach (var cond in conditionSheet) {
-			if (cond.ContentType.Row == 2)
+			if (cond.ContentType.RowId == 2)
 				Dungeons.Add(cond);
 
-			if (cond.ContentMemberType.Row == 4)
+			if (cond.ContentMemberType.RowId == 4)
 				Alliances.Add(cond);
 
-			if (cond.ContentMemberType.Row == 3)
+			if (cond.ContentMemberType.RowId == 3)
 				Raids.Add(cond);
+
+			if (cond.ContentType.RowId == 4)
+				Trials.Add(cond);
 
 			if (cond.ContentLinkType != 1)
 				continue;
 
-			ConditionByInstance.TryAdd(cond.Content.Row, cond);
+			ConditionByInstance.TryAdd(cond.Content.RowId, cond);
 		}
 	}
 
@@ -154,13 +176,12 @@ internal static class Helpers {
 		ushort current = Service.ClientState.TerritoryType;
 
 		foreach (var duty in status.Duties) {
-			var row = sheet.GetRow(duty.Id);
-			if (row == null)
+			if (!sheet.TryGetRow(duty.Id, out var row))
 				continue;
 
 			var conds = GetConditionsForEntry(row);
 			foreach (var cond in conds) {
-				if (cond.TerritoryType.Row == current)
+				if (cond.TerritoryType.RowId == current)
 					return (row, duty.Status);
 			}
 		}
@@ -181,26 +202,28 @@ internal static class Helpers {
 			return conditions;
 
 		LoadConditionsByInstance();
+		uint min;
+		uint max;
 
 		switch (entry.Type) {
 			case 0:
 				// Specific Thing
-				if (ConditionByInstance.TryGetValue(entry.Data.Row, out var cond))
+				if (ConditionByInstance.TryGetValue(entry.Data.RowId, out var cond))
 					conditions.Add(cond);
 				break;
 
 			case 1:
 				// Dungeons (exact level)
 				foreach (var dungeon in Dungeons) {
-					if (dungeon.ClassJobLevelRequired == entry.Data.Row)
+					if (dungeon.ClassJobLevelRequired == entry.Data.RowId)
 						conditions.Add(dungeon);
 				}
 				break;
 
 			case 2:
 				// Dungeons (preceeding levels)
-				uint min = entry.Data.Row - 9;
-				uint max = entry.Data.Row - 1;
+				min = entry.Data.RowId - 8;
+				max = entry.Data.RowId - 0;
 				if (max == 49)
 					min = 1;
 
@@ -213,38 +236,38 @@ internal static class Helpers {
 
 			case 3:
 				// Special Instances
-				switch (entry.Data.Row) {
+				switch (entry.Data.RowId) {
 					case 5: // Crystaline Conflict
 						foreach (var thing in sheet) {
-							if (thing.ContentType.Row == 6 && (thing.ContentMemberType.Row == 29 || thing.ContentMemberType.Row == 30))
+							if (thing.ContentType.RowId == 6 && (thing.ContentMemberType.RowId == 29 || thing.ContentMemberType.RowId == 30))
 								conditions.Add(thing);
 						}
 						break;
 
 					case 6: // Frontline
 						foreach (var thing in sheet) {
-							if (thing.ContentType.Row == 6 && thing.ContentMemberType.Row == 7)
+							if (thing.ContentType.RowId == 6 && thing.ContentMemberType.RowId == 7)
 								conditions.Add(thing);
 						}
 						break;
 
 					case 9: // Deep Dungeons
 						foreach (var thing in sheet) {
-							if (thing.ContentType.Row == 21)
+							if (thing.ContentType.RowId == 21)
 								conditions.Add(thing);
 						}
 						break;
 
 					case 10: // Treasure Dungeons
 						foreach (var thing in sheet) {
-							if (thing.ContentType.Row == 9)
+							if (thing.ContentType.RowId == 9)
 								conditions.Add(thing);
 						}
 						break;
 
 					case 12: // Rival Wings
 						foreach (var thing in sheet) {
-							if (thing.ContentType.Row == 6 && thing.ContentMemberType.Row == 18)
+							if (thing.ContentType.RowId == 6 && thing.ContentMemberType.RowId == 18)
 								conditions.Add(thing);
 						}
 						break;
@@ -256,7 +279,7 @@ internal static class Helpers {
 				uint[]? ids = null;
 				uint? allianceLevel = null;
 
-				switch (entry.Data.Row) {
+				switch (entry.Data.RowId) {
 					case 2: // Binding Coil
 						ids = [93, 94, 95, 96, 97];
 						break;
@@ -374,6 +397,26 @@ internal static class Helpers {
 						allianceLevel = 90;
 						break;
 
+					case 31: // Asphodelos 1-4
+						ids = [808, 810, 800, 806];
+						break;
+
+					case 32: // Abyssos 5-8
+						ids = [880, 872, 876, 883];
+						break;
+
+					case 33: // Anabaseios 9-12
+						ids = [936, 938, 940, 942];
+						break;
+
+					case 34: // AAC Light-heavyweight M1 - M2
+						ids = [];
+						break;
+
+					case 35: // AAC Light-heavyweight M3 - M4
+						ids = [];
+						break;
+
 					default:
 						ids = null;
 						break;
@@ -388,10 +431,96 @@ internal static class Helpers {
 
 				if (ids != null)
 					foreach (uint id in ids) {
-						var thing = sheet.GetRow(id);
-						if (thing != null)
-							conditions.Add(thing);
+						if (sheet.TryGetRow(id, out var row))
+							conditions.Add(row);
 					}
+
+				break;
+
+			case 5:
+				// Leveling Dungeons (preceeding levels)
+				max = entry.Data.RowId;
+				min = max switch {
+					49 => 1, // Lv. 1-49
+					79 => 51, // Lv. 51-79
+					99 => 81, // Lv. 81-99,
+					_ => max // Unknown
+				};
+
+				foreach (var dungeon in Dungeons) {
+					uint lvl = dungeon.ClassJobLevelRequired;
+					// Any dungeon within that level range that is not of 0x level.
+					if (lvl >= min && lvl <= max && lvl % 10 != 0)
+						conditions.Add(dungeon);
+				}
+				break;
+
+			case 6:
+				// High-Level Dungeons
+				max = entry.Data.RowId;
+				min = max switch {
+					60 => 50, // Lv. 50-60
+					80 => 70, // Lv. 70-80
+					90 => 90, // Lv. 90
+					_ => max, // Unknown
+				};
+
+				foreach (var dungeon in Dungeons) {
+					uint lvl = dungeon.ClassJobLevelRequired;
+					// Any dungeon within that level range that is of x0 level.
+					if (lvl >= min && lvl <= max && lvl % 10 == 0)
+						conditions.Add(dungeon);
+				}
+				break;
+
+			case 7:
+				// Trials
+				max = entry.Data.RowId;
+				min = max switch {
+					60 => 50,  // Lv. 50-60
+					100 => 70, // Lv. 70-100
+					_ => max,  // Unknown
+				};
+
+				foreach(var trial in Trials) {
+					uint lvl = trial.ClassJobLevelRequired;
+					// Any trial within that level range
+					if (lvl >= min && lvl <= max)
+						conditions.Add(trial);
+				}
+				break;
+
+			case 8:
+				// Alliances
+				max = entry.Data.RowId;
+				min = max switch {
+					60 => 50, // Lv. 50-60
+					90 => 70, // Lv. 70-90
+					_ => max, // Unknown
+				};
+
+				foreach(var alliance in Alliances) {
+					uint lvl = alliance.ClassJobLevelRequired;
+					if (lvl >= min && lvl <= max)
+						conditions.Add(alliance);
+				}
+
+				break;
+
+			case 9:
+				// Raids
+				max = entry.Data.RowId;
+				min = max switch {
+					60 => 50, // Lv. 50-60
+					100 => 70, // Lv. 70-100,
+					_ => max, // Unknown
+				};
+
+				foreach(var raid in Raids) {
+					uint lvl = raid.ClassJobLevelRequired;
+					if (lvl >= min && lvl <= max)
+						conditions.Add(raid);
+				}
 
 				break;
 		}
@@ -400,7 +529,7 @@ internal static class Helpers {
 		byte maxLevel = byte.MinValue;
 
 		foreach (var cond in conditions) {
-			byte lvl = cond.ContentType.Row == 9 ? cond.ClassJobLevelSync : cond.ClassJobLevelRequired;
+			byte lvl = cond.ContentType.RowId == 9 ? cond.ClassJobLevelSync : cond.ClassJobLevelRequired;
 			if (lvl > maxLevel)
 				maxLevel = lvl;
 			if (lvl < minLevel)

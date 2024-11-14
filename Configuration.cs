@@ -1,13 +1,17 @@
 using System;
+using System.Collections.Generic;
 using System.Numerics;
 
 using Dalamud.Configuration;
 using Dalamud.Interface.Colors;
 
+using WTSync.Models;
+
 namespace WTSync;
 
 [Serializable]
 public class Configuration : IPluginConfiguration {
+
 	public int Version { get; set; } = 0;
 
 	public bool AcceptedTerms { get; set; } = false;
@@ -26,6 +30,8 @@ public class Configuration : IPluginConfiguration {
 	public float ImageScale { get; set; } = 1.0f;
 
 	// Server Bar
+
+	public bool RandomDutyOnClick { get; set; } = false;
 
 	public bool HideBarIfNoSticker { get; set; } = true;
 
@@ -49,6 +55,12 @@ public class Configuration : IPluginConfiguration {
 	public Vector4 ColorDutyAvailable { get; set; } = ImGuiColors.ParsedGreen;
 
 	public Vector4 ColorLevelLabel { get; set; } = ImGuiColors.ParsedBlue;
+
+	// Sorting
+
+	public int LastSort { get; set; } = -1;
+
+	public List<CustomSort> CustomSorts { get; set; } = [];
 
 
 	public void Save() {
