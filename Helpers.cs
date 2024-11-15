@@ -152,14 +152,18 @@ internal static class Helpers {
 			if (cond.ContentType.RowId == 2)
 				Dungeons.Add(cond);
 
-			if (cond.ContentMemberType.RowId == 4)
-				Alliances.Add(cond);
+			//if (cond.ContentType.RowId == 5) {
+				if (cond.AllianceRoulette)
+					Alliances.Add(cond);
+				else if (cond.NormalRaidRoulette)
+					// TODO: Check for Binding of Coil?
+					Raids.Add(cond);
+			//}
 
-			if (cond.ContentMemberType.RowId == 3)
-				Raids.Add(cond);
-
-			if (cond.ContentType.RowId == 4)
-				Trials.Add(cond);
+			//if (cond.ContentType.RowId == 4 && cond.ContentMemberType.RowId == 3) {
+				if (cond.TrialRoulette)
+					Trials.Add(cond);
+			//}
 
 			if (cond.ContentLinkType != 1)
 				continue;
@@ -410,11 +414,11 @@ internal static class Helpers {
 						break;
 
 					case 34: // AAC Light-heavyweight M1 - M2
-						ids = [];
+						ids = [985, 987];
 						break;
 
 					case 35: // AAC Light-heavyweight M3 - M4
-						ids = [];
+						ids = [989, 991];
 						break;
 
 					default:
@@ -449,8 +453,8 @@ internal static class Helpers {
 
 				foreach (var dungeon in Dungeons) {
 					uint lvl = dungeon.ClassJobLevelRequired;
-					// Any dungeon within that level range that is not of 0x level.
-					if (lvl >= min && lvl <= max && lvl % 10 != 0)
+					// Any dungeon in the level range in leveling roulette.
+					if (lvl >= min && lvl <= max && dungeon.LevelingRoulette)
 						conditions.Add(dungeon);
 				}
 				break;
@@ -467,8 +471,8 @@ internal static class Helpers {
 
 				foreach (var dungeon in Dungeons) {
 					uint lvl = dungeon.ClassJobLevelRequired;
-					// Any dungeon within that level range that is of x0 level.
-					if (lvl >= min && lvl <= max && lvl % 10 == 0)
+					// Any dungeon within that level range in the high-level roulette.
+					if (lvl >= min && lvl <= max && (dungeon.HighLevelRoulette || dungeon.ExpertRoulette))
 						conditions.Add(dungeon);
 				}
 				break;

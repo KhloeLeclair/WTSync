@@ -3,10 +3,12 @@ using System.Linq;
 
 using Dalamud;
 using Dalamud.Interface.Textures;
+using Dalamud.Interface.Utility.Raii;
 
 using FFXIVClientStructs.FFXIV.Client.Game.UI;
 
 using Lumina.Excel.Sheets;
+using Lumina.Text.ReadOnly;
 
 namespace WTSync.Models;
 
@@ -136,10 +138,10 @@ public record BingoEntry {
 		get {
 			if (_DisplayName == null) {
 				if (Data.Text.RowId != 0 && Data.Text.IsValid)
-					_DisplayName = Data.Text.Value.Description.ToString();
+					_DisplayName = Data.Text.Value.Description.ExtractText().ToString();
 
 				else if (Conditions.Count > 0)
-					_DisplayName = Conditions[0].Name.ToTitleCase();
+					_DisplayName = Conditions[0].Name.ExtractText().ToTitleCase();
 
 				else
 					_DisplayName = Localization.Localize("gui.unknown-order", "Unknown ({id})").Replace("{id}", Id.ToString());
@@ -163,7 +165,7 @@ public record BingoEntry {
 					? Conditions
 						.Select(x => {
 							uint lvl = x.ContentType.RowId == 9 ? x.ClassJobLevelSync : x.ClassJobLevelRequired;
-							return (x.Name.ToTitleCase(), lvl);
+							return (x.Name.ExtractText().ToTitleCase(), lvl);
 						})
 						.Where(x => !string.IsNullOrWhiteSpace(x.Item1))
 						.DistinctBy(x => x.Item1)
@@ -172,7 +174,7 @@ public record BingoEntry {
 							return $"{x.Item1} (Lv. {x.Item2})";
 						})
 					: Conditions
-						.Select(x => x.Name.ToTitleCase())
+						.Select(x => x.Name.ExtractText().ToTitleCase())
 						.Where(x => !string.IsNullOrWhiteSpace(x))
 						.Distinct();
 

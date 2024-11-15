@@ -217,15 +217,11 @@ internal static class GameState {
 			byte orderId = inst->WeeklyBingoOrderData[i];
 			var status = inst->GetWeeklyBingoTaskStatus(i);
 
-			Service.Logger.Debug($"Duty {i}: {orderId} -- {status}");
-
 			Duties[i] = new() {
 				Id = orderId,
 				Status = status,
 			};
 		}
-
-		Service.Logger.Debug($"Expires: {inst->WeeklyBingoExpireDateTime}, Stickers: {inst->WeeklyBingoNumPlacedStickers}, Points: {inst->WeeklyBingoNumSecondChancePoints}");
 
 		return new WTStatus() {
 			Expires = inst->WeeklyBingoExpireDateTime,
