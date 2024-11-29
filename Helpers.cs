@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Numerics;
 using System.Security.Cryptography;
@@ -35,7 +36,7 @@ internal static class Helpers {
 			byte[] digest = SHA256.HashData(buffer);
 			return Convert.ToHexString(digest);
 
-		} catch(AccessViolationException ex) {
+		} catch (AccessViolationException ex) {
 			if (!HasLoggedAVE) {
 				Service.Logger.Error($"There was an error while trying to hash a string. Details:\n{ex}");
 				HasLoggedAVE = true;
@@ -118,6 +119,18 @@ internal static class Helpers {
 		return input.ToString().ToTitleCase();
 	}
 
+	internal static void TryOpenURL(string url) {
+		try {
+			ProcessStartInfo ps = new(url) {
+				UseShellExecute = true
+			};
+
+			Process.Start(ps);
+		} catch {
+			/* do nothing ~ */
+		}
+	}
+
 	internal static Dictionary<uint, List<ContentFinderCondition>> OrderConditions { get; } = [];
 
 	internal static Dictionary<uint, (byte, byte)> OrderLevelRanges { get; } = [];
@@ -153,16 +166,16 @@ internal static class Helpers {
 				Dungeons.Add(cond);
 
 			//if (cond.ContentType.RowId == 5) {
-				if (cond.AllianceRoulette)
-					Alliances.Add(cond);
-				else if (cond.NormalRaidRoulette)
-					// TODO: Check for Binding of Coil?
-					Raids.Add(cond);
+			if (cond.AllianceRoulette)
+				Alliances.Add(cond);
+			else if (cond.NormalRaidRoulette)
+				// TODO: Check for Binding of Coil?
+				Raids.Add(cond);
 			//}
 
 			//if (cond.ContentType.RowId == 4 && cond.ContentMemberType.RowId == 3) {
-				if (cond.TrialRoulette)
-					Trials.Add(cond);
+			if (cond.TrialRoulette)
+				Trials.Add(cond);
 			//}
 
 			if (cond.ContentLinkType != 1)
@@ -486,7 +499,7 @@ internal static class Helpers {
 					_ => max,  // Unknown
 				};
 
-				foreach(var trial in Trials) {
+				foreach (var trial in Trials) {
 					uint lvl = trial.ClassJobLevelRequired;
 					// Any trial within that level range
 					if (lvl >= min && lvl <= max)
@@ -503,7 +516,7 @@ internal static class Helpers {
 					_ => max, // Unknown
 				};
 
-				foreach(var alliance in Alliances) {
+				foreach (var alliance in Alliances) {
 					uint lvl = alliance.ClassJobLevelRequired;
 					if (lvl >= min && lvl <= max)
 						conditions.Add(alliance);
@@ -520,7 +533,7 @@ internal static class Helpers {
 					_ => max, // Unknown
 				};
 
-				foreach(var raid in Raids) {
+				foreach (var raid in Raids) {
 					uint lvl = raid.ClassJobLevelRequired;
 					if (lvl >= min && lvl <= max)
 						conditions.Add(raid);

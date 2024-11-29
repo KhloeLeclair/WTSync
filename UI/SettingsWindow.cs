@@ -55,6 +55,14 @@ internal class SettingsWindow : Window {
 
 		//DrawCustomSortingSettings();
 
+		float pos = ImGui.GetCursorPosY();
+		ImGui.SetCursorPosY(pos + 32f);
+
+		if (ImGuiComponents.IconButtonWithText(Dalamud.Interface.FontAwesomeIcon.Globe, Localization.Localize("gui.website", "Open Website")))
+			Helpers.TryOpenURL("https://wtsync.khloeleclair.dev");
+
+		if (ImGuiComponents.IconButtonWithText(Dalamud.Interface.FontAwesomeIcon.ChartBar, Localization.Localize("gui.website.stats", "View Last Week's Statistics")))
+			Helpers.TryOpenURL("https://wtsync.khloeleclair.dev/stats");
 	}
 
 	public void DrawCustomSortingSettings() {
@@ -63,7 +71,6 @@ internal class SettingsWindow : Window {
 			return;
 
 		ImGui.TextWrapped(Localization.Localize("gui.settings.sorting.about", ""));
-
 
 	}
 
@@ -100,6 +107,17 @@ internal class SettingsWindow : Window {
 
 		if (ImGui.IsItemHovered())
 			ImGui.SetTooltip(Localization.Localize("gui.setting.random-duty.tip", "When this is enabled, clicking an entry's picture or title will select a random matching duty in Duty Finder rather than cycling through them."));
+
+		ImGui.Spacing();
+
+		bool allowAnalytics = !Config.OptOutAnalytics;
+		if (ImGui.Checkbox(Localization.Localize("gui.settings.analytics", "Contribute anonymous data to WTSync's statistics."), ref allowAnalytics)) {
+			Config.OptOutAnalytics = !allowAnalytics;
+			Config.Save();
+		}
+
+		if (ImGui.IsItemHovered())
+			ImGui.SetTooltip(Localization.Localize("gui.settings.analytics.tip", "This data is anonymized does not link to your character in any way.\n\nWTSync uses player submitted data to generate statistics about Wondrous Tails, including the\npercentage of journals containing each entry and what percentage of players complete which entries.\nIf you don't want your own data to be included in these statistics, you can disable that here.\n\nAlso, go check out the statistics on the WTSync website. They're neat!"));
 	}
 
 	public void DrawCustomizeWindowSettings() {

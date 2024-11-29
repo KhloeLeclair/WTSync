@@ -8,6 +8,7 @@ namespace WTSync.Models;
 
 public record WTStatusAndId {
 	public string Id { get; set; } = string.Empty;
+	public bool Anonymous { get; set; }
 	public WTStatus? Status { get; set; }
 }
 

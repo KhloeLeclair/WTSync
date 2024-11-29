@@ -126,8 +126,8 @@ public sealed class Plugin : IDalamudPlugin {
 	}
 
 	public void OnCommand(string command, string arguments) {
-		if ("settings".Equals(arguments, System.StringComparison.OrdinalIgnoreCase) ||
-			"setting".Equals(arguments, System.StringComparison.OrdinalIgnoreCase)
+		if ("settings".Equals(arguments, StringComparison.OrdinalIgnoreCase) ||
+			"setting".Equals(arguments, StringComparison.OrdinalIgnoreCase)
 		)
 			OnOpenConfig();
 		else
@@ -292,7 +292,7 @@ public sealed class Plugin : IDalamudPlugin {
 
 				string extraTip;
 				string warnTip = string.Empty;
-				if (! duty.Text.IsValid)
+				if (!duty.Text.IsValid)
 					extraTip = Localization.Localize("gui.server-bar.tooltip.match", "This duty is in your Wondrous Tails.");
 				else
 					extraTip = Localization.Localize("gui.server-bar.tooltip.inexact", "This duty is in your Wondrous Tails as \"{name}\".")

@@ -29,6 +29,8 @@ public class Configuration : IPluginConfiguration {
 
 	public float ImageScale { get; set; } = 1.0f;
 
+	public bool OptOutAnalytics { get; set; } = false;
+
 	// Server Bar
 
 	public bool RandomDutyOnClick { get; set; } = false;

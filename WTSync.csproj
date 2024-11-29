@@ -5,7 +5,7 @@
 	<PropertyGroup>
 		<Authors></Authors>
 		<Company></Company>
-		<Version>0.12.0.0</Version>
+		<Version>0.13.0.0</Version>
 		<Description>WTSync</Description>
 		<Copyright></Copyright>
 		<PackageProjectUrl>https://github.com/khloeleclair/WTSync</PackageProjectUrl>

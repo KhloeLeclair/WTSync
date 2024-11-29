@@ -47,6 +47,9 @@ internal class MainWindow : Window, IDisposable {
 	private CancellationTokenSource? destroyStateCancel;
 	private Task? destroyStateTask;
 
+	private Task<ShareResult>? ShareTask;
+	private ShareResult? ShareResult;
+
 	private DateTime LastPing = DateTime.MinValue;
 
 	public MainWindow(Plugin plugin) : base(
@@ -75,6 +78,10 @@ internal class MainWindow : Window, IDisposable {
 		SyncSocketClient?.Dispose();
 		SyncSocketClient = null;
 		PartyState = null;
+
+		ShareTask?.Dispose();
+		ShareTask = null;
+		ShareResult = null;
 
 		Plugin.PartyMemberTracker.MembersChanged -= OnMembersChanged;
 
@@ -159,6 +166,13 @@ internal class MainWindow : Window, IDisposable {
 	public override void Update() {
 		base.Update();
 
+		if (ShareTask != null) {
+			if (ShareTask.IsCompleted) {
+				ShareResult = ShareTask.Result;
+				ShareTask = null;
+			}
+		}
+
 		if (SyncSocketClient != null) {
 			if (PartyState == null) {
 				SyncSocketClient.Dispose();
@@ -237,6 +251,17 @@ internal class MainWindow : Window, IDisposable {
 
 	public override void OnOpen() {
 		base.OnOpen();
+
+		if (ShareTask != null) {
+			try {
+				ShareTask.Dispose();
+			} catch (Exception ex) {
+				Service.Logger.Warning($"Error disposing of share task: {ex}");
+			}
+			ShareTask = null;
+		}
+
+		ShareResult = null;
 
 		// Cancel any ongoing cancellation.
 		CancelDestroyStateTask();
@@ -324,6 +349,21 @@ internal class MainWindow : Window, IDisposable {
 		float rightSide = ImGui.GetWindowContentRegionMax().X;
 		float btnWidth = ImGui.GetFrameHeight();
 
+		if (ShareTask == null && ShareResult == null) {
+			ImGui.SameLine(rightSide - btnWidth - btnWidth - btnWidth - style.ItemSpacing.X - style.ItemSpacing.X);
+
+			ImGui.PushID("share-button");
+			if (ImGuiComponents.IconButton(FontAwesomeIcon.ShareAlt)) {
+				ShareResult = null;
+				ShareTask = Task.Run(Plugin.ServerClient.MakeShareLink);
+			}
+
+			if (ImGui.IsItemHovered())
+				ImGui.SetTooltip(Localization.Localize("gui.share.about", "Share your party's WTSync status!\n\nThis generates a link that someone without WTSync can use to view this information in their browser."));
+
+			ImGui.PopID();
+		}
+
 		ImGui.SameLine(rightSide - btnWidth - btnWidth - style.ItemSpacing.X);
 
 		bool isUpdating = Plugin.ServerClient.HasPendingUpdate;
@@ -374,6 +414,47 @@ internal class MainWindow : Window, IDisposable {
 				LastClickedThing = 0;
 
 			return;
+		}
+
+		// If we have a share task...
+		if (ShareTask != null)
+			ImGui.TextWrapped(Localization.Localize("gui.share.loading", "Generating share link..."));
+		else if (ShareResult is ShareResult sr) {
+			if (!string.IsNullOrEmpty(sr.Error)) {
+				ImGui.TextColored(ImGuiColors.DalamudYellow, Localization.Localize("gui.share.error", "Share Error:"));
+				ImGui.TextWrapped(sr.Error);
+			} else {
+				ImGui.TextWrapped(Localization.Localize("gui.share.success", "Here's your link! This will expire in 30 minutes."));
+				ImGui.Spacing();
+
+				string url = sr.Url ?? string.Empty;
+				if (!string.IsNullOrWhiteSpace(url)) {
+					ImGui.InputText(Localization.Localize("gui.url", "URL"), ref url, (uint) url.Length, ImGuiInputTextFlags.AutoSelectAll | ImGuiInputTextFlags.ReadOnly);
+					ImGui.SameLine();
+					ImGui.PushID("copy-to-clipboard#url");
+					if (ImGuiComponents.IconButton(FontAwesomeIcon.Clipboard)) {
+						ImGui.SetClipboardText(url);
+						string msg = Localization.Localize("gui.copied-to-clipboard", "Copied to Clipboard");
+						Service.NotificationManager.AddNotification(new() {
+							MinimizedText = msg,
+							Content = msg,
+							Type = Dalamud.Interface.ImGuiNotification.NotificationType.Success
+						});
+					}
+					if (ImGui.IsItemHovered())
+						ImGui.SetTooltip(Localization.Localize("gui.copy-to-clipboard", "Copy to Clipboard"));
+					ImGui.PopID();
+
+					if (ImGui.Button(Localization.Localize("gui.open-browser", "Open in Browser")))
+						Helpers.TryOpenURL(url);
+				}
+			}
+
+			if (ImGui.Button(Localization.Localize("gui.done", "Done")))
+				ShareResult = null;
+
+			var pos = ImGui.GetCursorPos();
+			ImGui.SetCursorPosY(pos.Y + 32f);
 		}
 
 		// First, show each person in the party and their stickers.

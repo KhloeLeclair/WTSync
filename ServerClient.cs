@@ -94,6 +94,38 @@ internal class ServerClient : IDisposable {
 			});
 	}
 
+	public async Task<ShareResult> MakeShareLink() {
+
+		if (!Service.ClientState.IsLoggedIn || Plugin.PartyMemberTracker.Members.Count <= 0)
+			return new(false, "Not logged in.", null);
+
+		// We want to abbreviate player names so they aren't shown in full on
+		// a share. This way it just shows the first and last initial, which
+		// should be plenty for most situations.
+		var data = new ShareRequest();
+		foreach (var member in Plugin.PartyMemberTracker.Members) {
+			data.Members.Add(new(
+				Helpers.Abbreviate(member.Name, 3),
+				member.Id
+			));
+		}
+
+		try {
+			Service.Logger.Debug($"Submitting request for share link to server.");
+			var response = await Client.PostAsJsonAsync($"{Plugin.Config.ServerUrl}/api/share", data, JSON_OPTIONS);
+			var respData = await response.Content.ReadFromJsonAsync<ShareResponse>();
+
+			if (respData != null && respData.Ok)
+				return new(true, null, respData.Url);
+
+		} catch (Exception ex) {
+			Service.Logger.Error($"Error requesting share link from server: {ex}");
+		}
+
+		return new(false, "The server returned an unexpected response. Try again in a bit.", null);
+
+	}
+
 	public async Task SubmitUpdates() {
 		// First, make sure to let some time pass in case the user does more things.
 		if (!isLoggingOut)
@@ -105,6 +137,7 @@ internal class ServerClient : IDisposable {
 			foreach (var entry in PendingStatus) {
 				entries.Add(new() {
 					Id = entry.Key,
+					Anonymous = Plugin.Config.OptOutAnalytics,
 					Status = entry.Value
 				});
 			}

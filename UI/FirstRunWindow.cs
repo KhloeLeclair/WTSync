@@ -61,6 +61,7 @@ internal class FirstRunWindow : Window {
 			Config.Save();
 			IsOpen = false;
 		}
+
 	}
 
 }
