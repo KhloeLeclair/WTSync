@@ -108,6 +108,16 @@ internal class SettingsWindow : Window {
 		if (ImGui.IsItemHovered())
 			ImGui.SetTooltip(Localization.Localize("gui.setting.random-duty.tip", "When this is enabled, clicking an entry's picture or title will select a random matching duty in Duty Finder rather than cycling through them."));
 
+		bool clickableDuties = Config.ClickableDuties;
+		if (ImGui.Checkbox(Localization.Localize("gui.settings.clickable", "Open the Duty Finder when clicking an entry in Wondrous Tails."), ref clickableDuties)) {
+			Config.ClickableDuties = clickableDuties;
+			Config.Save();
+			Plugin.ClickableDuties.UpdateSetting();
+		}
+
+		if (ImGui.IsItemHovered())
+			ImGui.SetTooltip(Localization.Localize("gui.settings.clickable.tip", "When this is enabled, clicking entries directly in Wondrous Tails will open your Duty Finder to a matching duty.\nNote that clicking entries in the WTSync window will always have this behavior."));
+
 		ImGui.Spacing();
 
 		bool allowAnalytics = !Config.OptOutAnalytics;

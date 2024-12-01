@@ -147,7 +147,7 @@ internal class ServerClient : IDisposable {
 		foreach (var entry in entries) {
 			try {
 				Service.Logger.Debug($"Submitting update for {entry.Id} to server.");
-				var response = await Client.PostAsJsonAsync($"{Plugin.Config.ServerUrl}/submit", entry, JSON_OPTIONS);
+				var response = await Client.PostAsJsonAsync($"{Plugin.Config.ServerUrl}/api/submit", entry, JSON_OPTIONS);
 
 				if (!response.IsSuccessStatusCode) {
 					string state = await response.Content.ReadAsStringAsync();

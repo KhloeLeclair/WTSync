@@ -129,7 +129,7 @@ public sealed class SyncSocketClient : IDisposable {
 	public string Url {
 		get {
 			string idString = string.Join(',', IDs);
-			string uri = $"{Plugin.Config.ServerUrl}/party/{idString}";
+			string uri = $"{Plugin.Config.ServerUrl}/api/party/{idString}";
 			if (uri.StartsWith("http:"))
 				uri = $"ws:{uri[5..]}";
 			else if (uri.StartsWith("https:"))

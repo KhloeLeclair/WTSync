@@ -36,6 +36,8 @@ public sealed class Plugin : IDalamudPlugin {
 
 	internal WindowSystem WindowSystem { get; } = new WindowSystem("WTSync");
 
+	internal ClickableDuties ClickableDuties { get; private set; }
+
 	internal MainWindow MainWindow { get; private set; }
 
 	internal SettingsWindow SettingsWindow { get; private set; }
@@ -91,6 +93,9 @@ public sealed class Plugin : IDalamudPlugin {
 		SettingsWindow = new(this);
 		WindowSystem.AddWindow(SettingsWindow);
 
+		// Clickable Duties
+		ClickableDuties = new(this);
+
 		// Server Bar
 		dtrEntry = Service.DtrBar.Get("WTSync");
 		dtrEntry.Shown = false;
@@ -143,6 +148,9 @@ public sealed class Plugin : IDalamudPlugin {
 		FirstRunWindow = null;
 
 		dtrEntry.Remove();
+
+		// Clickable Duties
+		ClickableDuties.Dispose();
 
 		// Commands
 		Service.CommandManager.RemoveHandler("/wtsync");

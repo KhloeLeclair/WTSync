@@ -31,6 +31,9 @@ internal class Service {
 	internal static IAddonLifecycle AddonLifecycle { get; private set; } = null!;
 
 	[PluginService]
+	internal static IAddonEventManager AddonEventManager { get; private set; } = null!;
+
+	[PluginService]
 	internal static IFramework Framework { get; private set; } = null!;
 
 	[PluginService]

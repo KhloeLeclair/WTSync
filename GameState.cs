@@ -249,7 +249,7 @@ internal static class GameState {
 
 	internal static unsafe void OpenRoulette(byte id) {
 		var inst = AgentContentsFinder.Instance();
-		if (inst is null || GameState.IsInQueue) return;
+		if (inst is null || GameState.IsInDuty) return;
 
 		inst->OpenRouletteDuty(id);
 	}

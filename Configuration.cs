@@ -31,9 +31,11 @@ public class Configuration : IPluginConfiguration {
 
 	public bool OptOutAnalytics { get; set; } = false;
 
-	// Server Bar
+	public bool ClickableDuties { get; set; } = true;
 
 	public bool RandomDutyOnClick { get; set; } = false;
+
+	// Server Bar
 
 	public bool HideBarIfNoSticker { get; set; } = true;
 
