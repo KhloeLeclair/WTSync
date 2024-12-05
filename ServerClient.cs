@@ -52,6 +52,14 @@ internal class ServerClient : IDisposable {
 		Client.Dispose();
 	}
 
+	public void WaitForUpload() {
+		try {
+			UploadTask?.Wait();
+		} catch (Exception ex) {
+			Service.Logger.Error($"Error while waiting for upload task: {ex}");
+		}
+	}
+
 	public SyncSocketClient StartStatusFeed(IEnumerable<string> ids) {
 		return new SyncSocketClient(Plugin, ids);
 	}
@@ -96,7 +104,7 @@ internal class ServerClient : IDisposable {
 
 	public async Task<ShareResult> MakeShareLink() {
 
-		if (!Service.ClientState.IsLoggedIn || Plugin.PartyMemberTracker.Members.Count <= 0)
+		if (!Service.ClientState.IsLoggedIn || Plugin.Config.IsIncognito || Plugin.PartyMemberTracker.Members.Count <= 0)
 			return new(false, "Not logged in.", null);
 
 		// We want to abbreviate player names so they aren't shown in full on

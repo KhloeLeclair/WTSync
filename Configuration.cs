@@ -35,6 +35,13 @@ public class Configuration : IPluginConfiguration {
 
 	public bool RandomDutyOnClick { get; set; } = false;
 
+	// Incognito Mode
+
+	public IncognitoBehavior IncognitoBehavior { get; set; } = IncognitoBehavior.DisableAtStartup;
+
+	public bool IsIncognito { get; set; } = false;
+
+
 	// Server Bar
 
 	public bool HideBarIfNoSticker { get; set; } = true;
@@ -73,3 +80,9 @@ public class Configuration : IPluginConfiguration {
 	}
 
 }
+
+public enum IncognitoBehavior {
+	DisableAtStartup,
+	EnableAtStartup,
+	Remember
+};

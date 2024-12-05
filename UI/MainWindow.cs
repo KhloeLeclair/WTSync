@@ -127,6 +127,8 @@ internal class MainWindow : Window, IDisposable {
 
 		Position = new(x, addon->Y);
 		PositionCondition = ImGuiCond.Always;
+
+		// TODO: Check how many stickers the player has and send an update.
 	}
 
 	private void OnPreFinalize(AddonEvent type, AddonArgs args) {
@@ -269,7 +271,7 @@ internal class MainWindow : Window, IDisposable {
 		// If we have existing state, check to see if the party is
 		// still the same.
 		if (PartyState != null) {
-			var members = Plugin.PartyMemberTracker.Members;
+			var members = Config.IsIncognito ? Plugin.PartyMemberTracker.LocalOnly : Plugin.PartyMemberTracker.Members;
 			var oldMembers = PartyState.PlayerNames.Keys;
 
 			if (oldMembers.Count == members.Count) {
@@ -318,11 +320,65 @@ internal class MainWindow : Window, IDisposable {
 
 		bool isSolo = PartyState != null && PartyState.PlayerNames.Count <= 1;
 		bool isBusted = PartyState != null && PartyState.PlayerNames.Count <= 0;
+		bool isUpdating = Plugin.ServerClient.HasPendingUpdate;
+		string? updateError = Plugin.ServerClient.LastError;
+		bool isError = updateError is not null;
 
-		if (isSolo) {
-			ImGui.TextColored(ImGuiColors.DalamudGrey, Localization.Localize("gui.load-state.offline", "Offline"));
+		ImGui.PushID("incognito-toggle");
+
+		//if (!Config.IsIncognito)
+		//	ImGui.PushStyleColor(ImGuiCol.Button, ImGuiColors.HealerGreen);
+
+		if (ImGuiComponents.IconButton(
+			Config.IsIncognito
+				? FontAwesomeIcon.Globe
+				: isError
+					? FontAwesomeIcon.ExclamationTriangle
+					: FontAwesomeIcon.PowerOff
+		))
+			Plugin.ToggleIncognito();
+
+		//if (!Config.IsIncognito)
+		//	ImGui.PopStyleColor();
+
+		if (ImGui.IsItemHovered()) {
+			string? tip;
+			if (Config.IsIncognito)
+				tip = Localization.Localize("gui.incognito.offline", "You are offline. Your state is not being shared.");
+			else if (isUpdating)
+				tip = Localization.Localize("gui.connection.updating", "Your status is being uploaded to the server. Please wait a few seconds.");
+			else if (Plugin.ServerClient.LastError != null)
+				tip = Localization.Localize("gui.connection.error", "There was an error uploading your status to the server.\nWe will try again.\n\nDetails can be found in Dalamud's log.");
+			else
+				tip = null;
+
+			string to_do;
+			if (Config.IsIncognito)
+				to_do = Localization.Localize("gui.incognito.to-disable", "Click here to go back online and start sharing your Wondrous Tails again.");
+			else
+				to_do = Localization.Localize("gui.incognito.to-enable", "Click to go offline and stop sharing your Wondrous Tails.");
+
+			if (tip != null)
+				ImGui.SetTooltip(to_do + "\n\n" + tip);
+			else
+				ImGui.SetTooltip(to_do);
+		}
+
+		ImGui.PopID();
+
+		ImGui.SameLine();
+
+		if (Config.IsIncognito) {
+			ImGui.TextColored(ImGuiColors.DalamudGrey, Localization.Localize("gui.load-state.incognito", "Offline"));
 			if (ImGui.IsItemHovered())
-				ImGui.SetTooltip(Localization.Localize("gui.load-state.offline.about", "You are not in a party, so there is no need to connect to the server to receive data."));
+				ImGui.SetTooltip(isSolo
+					? Localization.Localize("gui.load-state.incognito.about-solo", "You are using WTSync in offline mode.")
+					: Localization.Localize("gui.load-state.incognito.about", "You are using WTSync in offline mode. Go back online to check your party's data."));
+
+		} else if (isSolo) {
+			ImGui.TextColored(ImGuiColors.DalamudGrey, Localization.Localize("gui.load-state.solo", "Solo"));
+			if (ImGui.IsItemHovered())
+				ImGui.SetTooltip(Localization.Localize("gui.load-state.solo.about", "You are not in a party, so there is no need to connect to the server to receive data."));
 
 		} else if (SyncSocketClient == null) {
 			ImGui.Text(Localization.Localize("gui.load-state.disconnected", "Disconnected."));
@@ -349,8 +405,8 @@ internal class MainWindow : Window, IDisposable {
 		float rightSide = ImGui.GetWindowContentRegionMax().X;
 		float btnWidth = ImGui.GetFrameHeight();
 
-		if (ShareTask == null && ShareResult == null) {
-			ImGui.SameLine(rightSide - btnWidth - btnWidth - btnWidth - style.ItemSpacing.X - style.ItemSpacing.X);
+		if (!Config.IsIncognito && ShareTask == null && ShareResult == null) {
+			ImGui.SameLine(rightSide - btnWidth - btnWidth - style.ItemSpacing.X);
 
 			ImGui.PushID("share-button");
 			if (ImGuiComponents.IconButton(FontAwesomeIcon.ShareAlt)) {
@@ -363,36 +419,6 @@ internal class MainWindow : Window, IDisposable {
 
 			ImGui.PopID();
 		}
-
-		ImGui.SameLine(rightSide - btnWidth - btnWidth - style.ItemSpacing.X);
-
-		bool isUpdating = Plugin.ServerClient.HasPendingUpdate;
-		string? updateError = Plugin.ServerClient.LastError;
-		bool isError = updateError is not null;
-
-		ImGui.PushID("sync-button");
-
-		if (ImGuiComponents.IconButton(isError
-			? FontAwesomeIcon.ExclamationTriangle
-			: isUpdating
-				? FontAwesomeIcon.Sync
-				: FontAwesomeIcon.Upload
-			) && !isUpdating
-		)
-			Plugin.SendServerUpdate(true);
-
-		if (ImGui.IsItemHovered()) {
-			string tip = isUpdating
-				? Localization.Localize("gui.force-sync.updating", "Your status is being uploaded to the server. Please wait a few seconds.")
-				: Localization.Localize("gui.force-sync.about", "Click this button to re-submit your status to the server.\n\nYou should only need to use this if your party members\ndon't see your Wondrous Tails data correctly for some reason.");
-
-			if (Plugin.ServerClient.LastError != null)
-				tip += "\n\n" + Localization.Localize("gui.force-sync.error", "There was an error uploading your status to the server.\nWe will try again.\n\nError:") + "\n" + Plugin.ServerClient.LastError;
-
-			ImGui.SetTooltip(tip);
-		}
-
-		ImGui.PopID();
 
 		ImGui.SameLine(rightSide - btnWidth);
 

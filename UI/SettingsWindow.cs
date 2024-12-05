@@ -15,6 +15,7 @@ internal class SettingsWindow : Window {
 
 	private Configuration Config => Plugin.Config;
 
+	private string[] IncognitoModes = [];
 	private string[] Sides = [];
 	private string[] BarColorModes = [];
 
@@ -31,6 +32,12 @@ internal class SettingsWindow : Window {
 	public void OpenSettings() {
 		IsOpen = true;
 		WindowName = Localization.Localize("gui.settings", "WTSync Settings");
+
+		IncognitoModes = [
+			Localization.Localize("gui.setting.incognito.disable-at-startup", "Start Online"),
+			Localization.Localize("gui.setting.incognito.enable-at-startup", "Start Offline"),
+			Localization.Localize("gui.setting.incognito.remember", "Remember Last State")
+		];
 
 		Sides = [
 			Localization.Localize("gui.setting.attach-left", "Left"),
@@ -55,8 +62,33 @@ internal class SettingsWindow : Window {
 
 		//DrawCustomSortingSettings();
 
-		float pos = ImGui.GetCursorPosY();
-		ImGui.SetCursorPosY(pos + 32f);
+		DrawServerSettings();
+
+	}
+
+	public void DrawServerSettings() {
+		if (!ImGui.CollapsingHeader(Localization.Localize("gui.settings.server", "Server")))
+			return;
+
+		int behavior = (int) Config.IncognitoBehavior;
+		if (ImGui.Combo(Localization.Localize("gui.setting.incognito", "Offline Mode"), ref behavior, IncognitoModes, 3)) {
+			Config.IncognitoBehavior = (IncognitoBehavior) behavior;
+			Config.Save();
+		}
+
+		if (ImGui.IsItemHovered())
+			ImGui.SetTooltip(Localization.Localize("gui.setting.incognito.about", "This lets you control if WTSync starts online or not when you start FFXIV."));
+
+		bool allowAnalytics = !Config.OptOutAnalytics;
+		if (ImGui.Checkbox(Localization.Localize("gui.settings.analytics", "Contribute anonymous data to WTSync's statistics."), ref allowAnalytics)) {
+			Config.OptOutAnalytics = !allowAnalytics;
+			Config.Save();
+		}
+
+		if (ImGui.IsItemHovered())
+			ImGui.SetTooltip(Localization.Localize("gui.settings.analytics.tip", "This data is anonymized does not link to your character in any way.\n\nWTSync uses player submitted data to generate statistics about Wondrous Tails, including the\npercentage of journals containing each entry and what percentage of players complete which entries.\nIf you don't want your own data to be included in these statistics, you can disable that here.\n\nAlso, go check out the statistics on the WTSync website. They're neat!"));
+
+		ImGui.SetCursorPosY(ImGui.GetCursorPosY() + 32f);
 
 		if (ImGuiComponents.IconButtonWithText(Dalamud.Interface.FontAwesomeIcon.Globe, Localization.Localize("gui.website", "Open Website")))
 			Helpers.TryOpenURL("https://wtsync.khloeleclair.dev");
@@ -118,16 +150,6 @@ internal class SettingsWindow : Window {
 		if (ImGui.IsItemHovered())
 			ImGui.SetTooltip(Localization.Localize("gui.settings.clickable.tip", "When this is enabled, clicking entries directly in Wondrous Tails will open your Duty Finder to a matching duty.\nNote that clicking entries in the WTSync window will always have this behavior."));
 
-		ImGui.Spacing();
-
-		bool allowAnalytics = !Config.OptOutAnalytics;
-		if (ImGui.Checkbox(Localization.Localize("gui.settings.analytics", "Contribute anonymous data to WTSync's statistics."), ref allowAnalytics)) {
-			Config.OptOutAnalytics = !allowAnalytics;
-			Config.Save();
-		}
-
-		if (ImGui.IsItemHovered())
-			ImGui.SetTooltip(Localization.Localize("gui.settings.analytics.tip", "This data is anonymized does not link to your character in any way.\n\nWTSync uses player submitted data to generate statistics about Wondrous Tails, including the\npercentage of journals containing each entry and what percentage of players complete which entries.\nIf you don't want your own data to be included in these statistics, you can disable that here.\n\nAlso, go check out the statistics on the WTSync website. They're neat!"));
 	}
 
 	public void DrawCustomizeWindowSettings() {

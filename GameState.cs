@@ -108,6 +108,12 @@ internal static class GameState {
 		}
 	}
 
+	internal static PartyMember? ReadLocalPlayer() {
+		if (Service.ClientState.IsLoggedIn && Service.ClientState.LocalPlayer != null && Service.ClientState.LocalContentId > 0 && GameState.LocalPlayerId is string lpid)
+			return new(Service.ClientState.LocalPlayer.Name.ToString(), lpid);
+		return null;
+	}
+
 	internal static List<PartyMember> ReadPartyMembers() {
 		if (!Service.ClientState.IsLoggedIn)
 			return [];
@@ -148,8 +154,8 @@ internal static class GameState {
 				}
 		}
 
-		if (result.Count == 0 && Service.ClientState.LocalPlayer != null && Service.ClientState.LocalContentId > 0 && GameState.LocalPlayerId is string lpid)
-			result.Add(new(Service.ClientState.LocalPlayer.Name.ToString(), lpid));
+		if (result.Count == 0 && ReadLocalPlayer() is PartyMember pm)
+			result.Add(pm);
 
 		return result;
 	}

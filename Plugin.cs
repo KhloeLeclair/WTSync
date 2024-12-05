@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Numerics;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -82,6 +83,12 @@ public sealed class Plugin : IDalamudPlugin {
 			}
 		});*/
 
+		Config.IsIncognito = Config.IncognitoBehavior switch {
+			IncognitoBehavior.DisableAtStartup => false,
+			IncognitoBehavior.EnableAtStartup => true,
+			_ => Config.IsIncognito
+		};
+
 		// Client Stuff
 		PartyMemberTracker = new();
 		ServerClient = new(this);
@@ -140,6 +147,11 @@ public sealed class Plugin : IDalamudPlugin {
 	}
 
 	public void Dispose() {
+		// Remove our data from the server, and wait a bit so the
+		// requests actually go through.
+		if (ClearServerData())
+			ServerClient.WaitForUpload();
+
 		// UI Cleanup
 		WindowSystem.RemoveAllWindows();
 
@@ -200,6 +212,30 @@ public sealed class Plugin : IDalamudPlugin {
 
 	#region Server Communication
 
+	public void ToggleIncognito() {
+		Config.IsIncognito = !Config.IsIncognito;
+		Config.Save();
+
+		if (Config.IsIncognito) {
+			ClearServerData();
+			UpdateBar();
+		} else
+			SendServerUpdate();
+
+		if (MainWindow.IsOpen)
+			MainWindow.OnOpen();
+	}
+
+	private bool ClearServerData() {
+		if (PreviousStatus.Count > 0) {
+			ServerClient.HandleLogout(PreviousStatus.Keys);
+			PreviousStatus.Clear();
+			return true;
+		}
+
+		return false;
+	}
+
 	public void SendServerUpdate(bool forceUpdate = false) {
 		string? myId = GameState.LocalPlayerId;
 		if (myId == null || !Service.ClientState.IsLoggedIn)
@@ -214,9 +250,9 @@ public sealed class Plugin : IDalamudPlugin {
 		};
 
 		// Check to see if this changed.
-		bool do_update = forceUpdate ||
+		bool do_update = !Config.IsIncognito && (forceUpdate ||
 			!PreviousStatus.TryGetValue(result.Id, out var previous) ||
-			!EqualityComparer<WTStatus>.Default.Equals(previous, result.Status);
+			!EqualityComparer<WTStatus>.Default.Equals(previous, result.Status));
 
 		// Server Update
 		if (do_update) {
@@ -238,7 +274,7 @@ public sealed class Plugin : IDalamudPlugin {
 		if (myId is null)
 			return null;
 
-		var members = PartyMemberTracker.Members;
+		var members = Config.IsIncognito ? PartyMemberTracker.LocalOnly : PartyMemberTracker.Members;
 		var client = members.Count <= 1 ? null : ServerClient.StartStatusFeed(members
 			.Select(x => x.Id)
 			// We don't need to subscribe to our own WT state.
@@ -287,8 +323,14 @@ public sealed class Plugin : IDalamudPlugin {
 				return;
 			}
 
-			dtrEntry.Tooltip = Localization.Localize("gui.server-bar.tooltip", "Wondrous Tails Completion");
-			dtrEntry.Text = Localization.Localize("gui.server-bar.info", "WT: {stickers} / 9  {points}")
+			Vector4? color = null;
+			Vector4? colorEdge = null;
+			string? icon = null;
+			string? extraTip = null;
+			string? warnTip = null;
+
+			string tooltip = Localization.Localize("gui.server-bar.tooltip", "Wondrous Tails Completion");
+			string label = Localization.Localize("gui.server-bar.info", "WT: {stickers} / 9  {points}")
 				.Replace("{stickers}", claimable.ToString())
 				.Replace("{points}", BarStatus.SecondChancePoints == 0
 					? BarStatus.SecondChancePoints.ToBoxedNumber()
@@ -298,8 +340,6 @@ public sealed class Plugin : IDalamudPlugin {
 				var duty = matchingDuty.Value.Item1;
 				var status = matchingDuty.Value.Item2;
 
-				string extraTip;
-				string warnTip = string.Empty;
 				if (!duty.Text.IsValid)
 					extraTip = Localization.Localize("gui.server-bar.tooltip.match", "This duty is in your Wondrous Tails.");
 				else
@@ -311,43 +351,75 @@ public sealed class Plugin : IDalamudPlugin {
 
 				if (!isOpen) {
 					if (isClaimable)
-						warnTip += "\n\n" + Localization.Localize("gui.server-bar.tooltip.claimable", "You have already completed this duty. Use a Second Chance point to retry it if you want to earn another sticker.");
+						warnTip = "\n\n" + Localization.Localize("gui.server-bar.tooltip.claimable", "You have already completed this duty. Use a Second Chance point to retry it if you want to earn another sticker.");
 					else
-						warnTip += "\n\n" + Localization.Localize("gui.server-bar.tooltip.unavialable", "You have already completed this duty and have no Second Chance points to retry it.");
+						warnTip = "\n\n" + Localization.Localize("gui.server-bar.tooltip.unavialable", "You have already completed this duty and have no Second Chance points to retry it.");
 				}
 
-				var builder = new SeStringBuilder();
+				icon = isOpen ? "\uE0BE" : "\uE0BF";
 
 				if (Config.BarColorMode > 0) {
-					if (isOpen)
-						builder
-							.PushColorRgba(Config.BarColorInDuty)
-							.PushEdgeColorRgba(Config.BarColorInDutyEdge);
-					else
-						builder
-							.PushColorRgba(Config.BarColorDutyClaimed)
-							.PushEdgeColorRgba(Config.BarColorDutyClaimedEdge);
+					if (isOpen) {
+						color = Config.BarColorInDuty;
+						colorEdge = Config.BarColorInDutyEdge;
+					} else {
+						color = Config.BarColorDutyClaimed;
+						colorEdge = Config.BarColorDutyClaimedEdge;
+					}
 				}
-
-				builder.Append(isOpen ? "\uE0BE " : "\uE0BF ");
-
-				if (Config.BarColorMode == 1)
-					builder.PopColor().PopEdgeColor();
-
-				builder.Append(dtrEntry.Text);
-				dtrEntry.Text = builder.ToSeString().ToDalamudString();
-
-				dtrEntry.Tooltip = new SeStringBuilder()
-					.Append(dtrEntry.Tooltip)
-					.Append("\n\n")
-					.AppendSetItalic(true)
-					.Append(extraTip)
-					.AppendSetItalic(false)
-					.AppendSetBold(true)
-					.Append(warnTip)
-					.AppendSetBold(false)
-					.ToSeString().ToDalamudString();
 			}
+
+			if (Config.IsIncognito) {
+				if (string.IsNullOrEmpty(icon))
+					icon = "\uE043";
+
+				string tip = Localization.Localize("gui.server-bar.tooltip.incognito", "WTSync is currently offline. Your state is not being shared.");
+				if (string.IsNullOrEmpty(extraTip))
+					extraTip = tip;
+				else
+					extraTip = $"{tip}\n\n{extraTip}";
+			}
+
+			var builder = new SeStringBuilder();
+			if (color.HasValue)
+				builder.PushColorRgba(color.Value);
+			if (colorEdge.HasValue)
+				builder.PushEdgeColorRgba(colorEdge.Value);
+
+			if (!string.IsNullOrEmpty(icon))
+				builder
+					.Append(icon)
+					.Append(' ');
+
+			if (Config.BarColorMode == 1) {
+				if (color.HasValue)
+					builder.PopColor();
+				if (colorEdge.HasValue)
+					builder.PopEdgeColor();
+			}
+
+			builder.Append(label);
+
+			dtrEntry.Text = builder.ToSeString().ToDalamudString();
+
+			builder = new SeStringBuilder();
+			builder.Append(tooltip);
+			if (!string.IsNullOrEmpty(extraTip) || !string.IsNullOrEmpty(warnTip)) {
+				builder.Append("\n\n");
+				if (!string.IsNullOrEmpty(extraTip))
+					builder
+						.AppendSetItalic(true)
+						.Append(extraTip)
+						.AppendSetItalic(false);
+
+				if (!string.IsNullOrEmpty(warnTip))
+					builder
+						.AppendSetBold(true)
+						.Append(warnTip)
+						.AppendSetBold(false);
+			}
+
+			dtrEntry.Tooltip = builder.ToSeString().ToDalamudString();
 
 			dtrEntry.Shown = true;
 		}
@@ -366,14 +438,12 @@ public sealed class Plugin : IDalamudPlugin {
 		}, new TimeSpan(0, 0, 10), cancellationToken: IdyllshireCancelToken.Token);
 	}
 
-
 	private void OnRefreshBingo(AddonEvent type, AddonArgs args) {
 		SendServerUpdate();
 	}
 
 	private void OnLogout(int type, int code) {
-		ServerClient.HandleLogout(PreviousStatus.Keys);
-		PreviousStatus.Clear();
+		ClearServerData();
 	}
 
 	private void OnLogin() {
