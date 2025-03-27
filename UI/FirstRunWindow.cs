@@ -26,7 +26,6 @@ internal class FirstRunWindow : Window {
 		SizeConstraints = new() {
 			MinimumSize = new Vector2(400, 100)
 		};
-
 	}
 
 	public override void OnClose() {
