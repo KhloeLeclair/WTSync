@@ -46,6 +46,9 @@ public class Configuration : IPluginConfiguration {
 
 	public bool HideBarIfNoSticker { get; set; } = true;
 
+	public bool HideBarIfNotInDuty { get; set; } = false;
+
+
 	public int BarColorMode { get; set; } = 0;
 
 	public Vector4 BarColorInDuty { get; set; } = Helpers.BAR_GREEN;

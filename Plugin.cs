@@ -301,7 +301,7 @@ public sealed class Plugin : IDalamudPlugin {
 	}
 
 	internal void UpdateBar() {
-		if (BarStatus is null)
+		if (BarStatus is null || (Config.HideBarIfNotInDuty && !GameState.IsInDuty))
 			dtrEntry.Shown = false;
 		else {
 			var matchingDuty = GameState.IsInDuty

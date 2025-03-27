@@ -249,6 +249,13 @@ internal class SettingsWindow : Window {
 				Plugin.UpdateBar();
 			}
 
+			bool hide_out = Config.HideBarIfNotInDuty;
+			if (ImGui.Checkbox(Localization.Localize("gui.settings.bar.hide-no-duty", "Hide when not in a duty."), ref hide_out)) {
+				Config.HideBarIfNotInDuty = hide_out;
+				Config.Save();
+				Plugin.UpdateBar();
+			}
+
 			if (ImGui.IsItemHovered())
 				ImGui.SetTooltip(Localization.Localize("gui.settings.bar.hide-no-sticker.about", "If this is enabled, the WTSync server info bar entry will not be displayed\nif you're in a duty and the duty isn't in your Wondrous Tails,\nor if you're already at nine stickers."));
 
