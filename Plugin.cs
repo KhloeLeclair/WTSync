@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 
 using Dalamud;
+using Dalamud.Game.Addon.Events.EventDataTypes;
 using Dalamud.Game.Addon.Lifecycle;
 using Dalamud.Game.Addon.Lifecycle.AddonArgTypes;
 using Dalamud.Game.Gui.Dtr;
@@ -400,7 +401,7 @@ public sealed class Plugin : IDalamudPlugin {
 
 			builder.Append(label);
 
-			dtrEntry.Text = builder.ToSeString().ToDalamudString();
+			dtrEntry.Text = builder.ToReadOnlySeString().ToDalamudString();
 
 			builder = new SeStringBuilder();
 			builder.Append(tooltip);
@@ -419,7 +420,7 @@ public sealed class Plugin : IDalamudPlugin {
 						.AppendSetBold(false);
 			}
 
-			dtrEntry.Tooltip = builder.ToSeString().ToDalamudString();
+			dtrEntry.Tooltip = builder.ToReadOnlySeString().ToDalamudString();
 
 			dtrEntry.Shown = true;
 		}
@@ -458,7 +459,10 @@ public sealed class Plugin : IDalamudPlugin {
 		WindowSystem.Draw();
 	}
 
-	public void ToggleMain() {
+	public void ToggleMain(AddonMouseEventData eventData) {
+		if (!eventData.IsLeftClick)
+			return;
+
 		if (MainWindow.IsOpen) {
 			if (!Config.OpenWithWT || !CloseWT())
 				MainWindow.IsOpen = false;
@@ -470,11 +474,12 @@ public sealed class Plugin : IDalamudPlugin {
 	/// If the Wondrous Tails menu is open, close it. Return whether or not we closed it.
 	/// </summary>
 	public unsafe bool CloseWT() {
-		var addon = (AtkUnitBase*) Service.GameGui.GetAddonByName("WeeklyBingo", 1);
-		if (addon is null || !addon->IsVisible)
+		var addon = Service.GameGui.GetAddonByName("WeeklyBingo", 1);
+		if (addon.IsNull || !addon.IsVisible)
 			return false;
 
-		addon->Close(true);
+		var cast = (AtkUnitBase*) addon.Address;
+		cast->Close(true);
 		return true;
 	}
 
@@ -483,8 +488,8 @@ public sealed class Plugin : IDalamudPlugin {
 	/// Return whether or not it is open (or we tried to open it).
 	/// </summary>
 	public unsafe bool OpenWT() {
-		var addon = (AtkUnitBase*) Service.GameGui.GetAddonByName("WeeklyBingo", 1);
-		if (addon is not null && addon->IsVisible)
+		var addon = Service.GameGui.GetAddonByName("WeeklyBingo", 1);
+		if (!addon.IsNull && addon.IsVisible)
 			return true;
 
 		// If we are occupied, we can't use an item.

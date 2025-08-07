@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Linq;
 using System.Numerics;
 using System.Security.Cryptography;
 using System.Text;
@@ -107,28 +108,12 @@ internal static class Helpers {
 		//return CultureInfo.CurrentUICulture.TextInfo.ToTitleCase(input);
 	}
 
-	internal static string ToTitleCase(this SeString input) {
-		return input.ToString().ToTitleCase();
-	}
-
 	internal static string ToTitleCase(this ReadOnlySeString input) {
 		return input.ToString().ToTitleCase();
 	}
 
 	internal static string ToTitleCase(this Dalamud.Game.Text.SeStringHandling.SeString input) {
 		return input.ToString().ToTitleCase();
-	}
-
-	internal static void TryOpenURL(string url) {
-		try {
-			ProcessStartInfo ps = new(url) {
-				UseShellExecute = true
-			};
-
-			Process.Start(ps);
-		} catch {
-			/* do nothing ~ */
-		}
 	}
 
 	internal static Dictionary<uint, List<ContentFinderCondition>> OrderConditions { get; } = [];
@@ -292,166 +277,17 @@ internal static class Helpers {
 				break;
 
 			case 4:
-				// Raid Sets
-				uint[]? ids = null;
-				uint? allianceLevel = null;
-
-				switch (entry.Data.RowId) {
-					case 2: // Binding Coil
-						ids = [93, 94, 95, 96, 97];
-						break;
-
-					case 3: // Second Coil
-							// Does savage count?
-						ids = [98, 99, 100, 101];
-						break;
-
-					case 4: // Final Coil
-						ids = [107, 108, 109, 110];
-						break;
-
-					case 5: // Alexander Gordias
-						ids = [112, 113, 114, 115];
-						break;
-
-					case 6: // Alexander Midas
-						ids = [136, 137, 138, 139];
-						break;
-
-					case 7: // Alexander Creator
-						ids = [186, 187, 188, 189];
-						break;
-
-					case 8: // Omega Deltascape
-						ids = [252, 253, 254, 255];
-						break;
-
-					case 9: // Omega Sigmascape
-						ids = [286, 287, 288, 289];
-						break;
-
-					case 10: // Omega Alphascape
-						ids = [587, 588, 589, 590];
-						break;
-
-					case 11: // Eden Gate Resurrection or Descent
-						ids = [653, 684];
-						break;
-
-					case 12: // Eden Gate Inundation or Sepulture
-						ids = [682, 689];
-						break;
-
-					case 13: // Eden Verse Fulmination or Furor
-						ids = [715, 719];
-						break;
-
-					case 14: // Eden Verse Iconoclasm or Refulgence
-						ids = [726, 728];
-						break;
-
-					case 15: // Eden Promise Umbra or Litany
-						ids = [747, 749];
-						break;
-
-					case 16: // Eden Promise Anamorphosis or Eternity
-						ids = [751, 758];
-						break;
-
-					case 17: // Asphodelos First or Second
-						ids = [808, 810];
-						break;
-
-					case 18: // Asphodelos Third or Fourth
-						ids = [800, 806];
-						break;
-
-					case 19: // Abyssos Fifth or Sixth
-						ids = [880, 872];
-						break;
-
-					case 20: // Abyssos Seventh or Eighth
-						ids = [876, 883];
-						break;
-
-					case 21: // Anabaseios: Ninth or Tenth
-						ids = [936, 938];
-						break;
-
-					case 22: // Anabaseios: Eleventh or Twelfth
-						ids = [940, 942];
-						break;
-
-					case 23: // Eden's Gate
-						ids = [653, 682, 684, 689];
-						break;
-
-					case 24: // Eden's Verse
-						ids = [715, 719, 726, 728];
-						break;
-
-					case 25: // Eden's Promise
-						ids = [747, 749, 751, 758];
-						break;
-
-					case 26: // Alliance (ARR)
-						allianceLevel = 50;
-						break;
-
-					case 27: // Alliance (HW)
-						allianceLevel = 60;
-						break;
-
-					case 28: // Alliance (SB)
-						allianceLevel = 70;
-						break;
-
-					case 29: // Alliance (ShB)
-						allianceLevel = 80;
-						break;
-
-					case 30: // Alliance (EW)
-						allianceLevel = 90;
-						break;
-
-					case 31: // Asphodelos 1-4
-						ids = [808, 810, 800, 806];
-						break;
-
-					case 32: // Abyssos 5-8
-						ids = [880, 872, 876, 883];
-						break;
-
-					case 33: // Anabaseios 9-12
-						ids = [936, 938, 940, 942];
-						break;
-
-					case 34: // AAC Light-heavyweight M1 - M2
-						ids = [985, 987];
-						break;
-
-					case 35: // AAC Light-heavyweight M3 - M4
-						ids = [989, 991];
-						break;
-
-					default:
-						ids = null;
-						break;
+				// Multiple Order Data
+				var orderSheet = Service.DataManager.GetExcelSheet<WeeklyBingoMultipleOrder>();
+				if (orderSheet != null && orderSheet.TryGetRow(entry.Data.RowId, out var orderData)) {
+					conditions.AddRange(
+						orderData.Content
+							.Where(x => x.IsValid && x.RowId != 0)
+							.Select(x => x.Value.ContentFinderCondition)
+							.Where(x => x.IsValid && x.RowId != 0)
+							.Select(x => x.Value)
+					);
 				}
-
-				if (allianceLevel.HasValue)
-					foreach (var raid in Alliances) {
-						uint lvl = raid.ClassJobLevelRequired;
-						if (lvl >= allianceLevel.Value && lvl <= allianceLevel.Value)
-							conditions.Add(raid);
-					}
-
-				if (ids != null)
-					foreach (uint id in ids) {
-						if (sheet.TryGetRow(id, out var row))
-							conditions.Add(row);
-					}
-
 				break;
 
 			case 5:

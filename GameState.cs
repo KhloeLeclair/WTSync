@@ -62,7 +62,7 @@ internal static class GameState {
 			return Service.Condition.Any(
 				ConditionFlag.BetweenAreas,
 				ConditionFlag.BetweenAreas51,
-				ConditionFlag.Mounted2, // Riding someone else's mount
+				ConditionFlag.RidingPillion,
 				ConditionFlag.Occupied,
 				ConditionFlag.Occupied30,
 				ConditionFlag.Occupied33,
@@ -163,8 +163,8 @@ internal static class GameState {
 	private static unsafe int? ReadCWPartyCount() {
 		var inst = InfoProxyCrossRealm.Instance();
 		// If we aren't in a cross-world party, or if we're in an alliance, then
-		// return null. This will force a fall-back 
-		if (inst is null || inst->IsInAllianceRaid != 0 || inst->IsInCrossRealmParty == 0)
+		// return null. This will force a fall-back
+		if (inst is null || inst->IsInAllianceRaid || ! inst->IsInCrossRealmParty)
 			return null;
 
 		// Sanity checking.
@@ -180,7 +180,7 @@ internal static class GameState {
 		var inst = InfoProxyCrossRealm.Instance();
 		// If we aren't in a cross-world party, or if we're in an alliance, then
 		// return null. This will force a fall-back 
-		if (inst is null || inst->IsInAllianceRaid != 0 || inst->IsInCrossRealmParty == 0)
+		if (inst is null || inst->IsInAllianceRaid || ! inst->IsInCrossRealmParty)
 			return null;
 
 		// Sanity checking.
@@ -218,11 +218,13 @@ internal static class GameState {
 			};*/
 
 		WTDutyStatus[] Duties = new WTDutyStatus[16];
+		bool[] StickerPlacement = new bool[16];
 
 		for (int i = 0; i < 16; i++) {
 			byte orderId = inst->WeeklyBingoOrderData[i];
 			var status = inst->GetWeeklyBingoTaskStatus(i);
 
+			StickerPlacement[i] = inst->IsWeeklyBingoStickerPlaced(i);
 			Duties[i] = new() {
 				Id = orderId,
 				Status = status,
@@ -232,6 +234,7 @@ internal static class GameState {
 		return new WTStatus() {
 			Expires = inst->WeeklyBingoExpireDateTime,
 			Stickers = (uint) Math.Max(0, inst->WeeklyBingoNumPlacedStickers),
+			StickerPlacement = StickerPlacement,
 			SecondChancePoints = inst->WeeklyBingoNumSecondChancePoints,
 			Duties = Duties
 		};

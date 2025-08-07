@@ -5,7 +5,8 @@ using Dalamud.Interface.Colors;
 using Dalamud.Interface.Components;
 using Dalamud.Interface.Windowing;
 
-using ImGuiNET;
+using Dalamud.Bindings.ImGui;
+using System.Collections.Generic;
 
 namespace WTSync.UI;
 
@@ -14,6 +15,7 @@ internal class SettingsWindow : Window {
 	private readonly Plugin Plugin;
 
 	private Configuration Config => Plugin.Config;
+	private bool changedName;
 
 	private string[] IncognitoModes = [];
 	private string[] Sides = [];
@@ -27,6 +29,15 @@ internal class SettingsWindow : Window {
 
 		Size = new Vector2(400, 100);
 		SizeCondition = ImGuiCond.Appearing;
+	}
+
+	public override void OnClose() {
+		base.OnClose();
+
+		if (changedName) {
+			Config.Save();
+			Plugin.SendServerUpdate(true);
+		}
 	}
 
 	public void OpenSettings() {
@@ -50,6 +61,8 @@ internal class SettingsWindow : Window {
 			Localization.Localize("gui.setting.bar-color-icon", "Icon Only"),
 			Localization.Localize("gui.setting.bar-color-all", "Everything")
 		];
+
+		changedName = false;
 	}
 
 	public override void Draw() {
@@ -88,13 +101,31 @@ internal class SettingsWindow : Window {
 		if (ImGui.IsItemHovered())
 			ImGui.SetTooltip(Localization.Localize("gui.settings.analytics.tip", "This data is anonymized does not link to your character in any way.\n\nWTSync uses player submitted data to generate statistics about Wondrous Tails, including the\npercentage of journals containing each entry and what percentage of players complete which entries.\nIf you don't want your own data to be included in these statistics, you can disable that here.\n\nAlso, go check out the statistics on the WTSync website. They're neat!"));
 
+		string? id = GameState.LocalPlayerId;
+		if (id != null) {
+			string shareName = Config.ShareNicknames.GetValueOrDefault(id) ?? string.Empty;
+			if (ImGui.InputText(
+				Localization.Localize("gui.settings.nickname", "Share Nickname"),
+				ref shareName
+			)) {
+				changedName = true;
+				if (string.IsNullOrWhiteSpace(shareName))
+					Config.ShareNicknames.Remove(id);
+				else
+					Config.ShareNicknames[id] = shareName;
+			}
+
+			if (ImGui.IsItemHovered())
+				ImGui.SetTooltip(Localization.Localize("gui.settings.nickname.tip", "When someone shares your party's WTSync status, the party's member names\nare replaced with their initials for anonymity. You can set a nickname here that gets\nused in shares instead. This nickname is not used in-game.\n\nNote: This is character specific."));
+		}
+
 		ImGui.SetCursorPosY(ImGui.GetCursorPosY() + 32f);
 
 		if (ImGuiComponents.IconButtonWithText(Dalamud.Interface.FontAwesomeIcon.Globe, Localization.Localize("gui.website", "Open Website")))
-			Helpers.TryOpenURL("https://wtsync.khloeleclair.dev");
+			Dalamud.Utility.Util.OpenLink("https://wtsync.khloeleclair.dev");
 
 		if (ImGuiComponents.IconButtonWithText(Dalamud.Interface.FontAwesomeIcon.ChartBar, Localization.Localize("gui.website.stats", "View Last Week's Statistics")))
-			Helpers.TryOpenURL("https://wtsync.khloeleclair.dev/stats");
+			Dalamud.Utility.Util.OpenLink("https://wtsync.khloeleclair.dev/stats");
 	}
 
 	public void DrawCustomSortingSettings() {
@@ -306,7 +337,7 @@ internal class SettingsWindow : Window {
 
 	}
 
-	internal bool DrawColorPicker(int id, string label, ref Vector4 color, Vector4 defaultValue, ImGuiColorEditFlags flags = ImGuiColorEditFlags.None) {
+	internal static bool DrawColorPicker(int id, string label, ref Vector4 color, Vector4 defaultValue, ImGuiColorEditFlags flags = ImGuiColorEditFlags.None) {
 
 		string resetLabel = Localization.Localize("gui.setting.reset", "Reset");
 		var resetSize = ImGui.CalcTextSize(resetLabel);

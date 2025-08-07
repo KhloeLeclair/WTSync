@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<Project Sdk="Dalamud.NET.Sdk/12.0.2">
+<Project Sdk="Dalamud.NET.Sdk/13.0.0">
 
 	<PropertyGroup>
-		<Version>0.16.0.0</Version>
+		<Version>0.17.0.0</Version>
 		<Description>WTSync</Description>
 		<PackageProjectUrl>https://github.com/khloeleclair/WTSync</PackageProjectUrl>
 	</PropertyGroup>

@@ -146,6 +146,7 @@ internal class ServerClient : IDisposable {
 				entries.Add(new() {
 					Id = entry.Key,
 					Anonymous = Plugin.Config.OptOutAnalytics,
+					Nickname = entry.Value is null ? null : Plugin.Config.ShareNicknames.GetValueOrDefault(entry.Key),
 					Status = entry.Value
 				});
 			}

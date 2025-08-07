@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 
 using FFXIVClientStructs.FFXIV.Client.Game.UI;
 
@@ -9,25 +8,19 @@ namespace WTSync.Models;
 public record WTStatusAndId {
 	public string Id { get; set; } = string.Empty;
 	public bool Anonymous { get; set; }
+	public string? Nickname { get; set; }
 	public WTStatus? Status { get; set; }
 }
 
 public class WTStatus : IEquatable<WTStatus> {
 
 	public WTStatus() { }
-	public WTStatus(DateTime expires, uint stickers, uint secondChancePoints, IEnumerable<WTDutyStatus> duties) {
-		Expires = expires;
-		Stickers = stickers;
-		SecondChancePoints = secondChancePoints;
-		if (duties is WTDutyStatus[] dutyArray)
-			Duties = dutyArray;
-		else
-			Duties = duties.ToArray();
-	}
 
 	public DateTime Expires { get; set; }
 
 	public uint Stickers { get; set; }
+
+	public bool[]? StickerPlacement { get; set; }
 
 	public uint SecondChancePoints { get; set; }
 
@@ -43,13 +36,24 @@ public class WTStatus : IEquatable<WTStatus> {
 				return false;
 		}
 
+		if ((other.StickerPlacement == null) != (StickerPlacement == null))
+			return false;
+		if (StickerPlacement != null) {
+			if (other.StickerPlacement!.Length != StickerPlacement.Length)
+				return false;
+			for (int i = 0; i < StickerPlacement.Length; i++) {
+				if (other.StickerPlacement[i] != StickerPlacement[i])
+					return false;
+			}
+		}
+
 		return Expires.Equals(other.Expires)
 			&& Stickers == other.Stickers
 			&& SecondChancePoints == other.SecondChancePoints;
 	}
 
 	public override int GetHashCode() {
-		return HashCode.Combine(Expires, Stickers, SecondChancePoints, Duties);
+		return HashCode.Combine(Expires, Stickers, SecondChancePoints, Duties, StickerPlacement);
 	}
 
 	public override bool Equals(object? obj) {
@@ -66,4 +70,3 @@ public record struct WTDutyStatus {
 	public PlayerState.WeeklyBingoTaskStatus Status { get; set; }
 
 }
-

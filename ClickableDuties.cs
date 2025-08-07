@@ -1,14 +1,18 @@
 using System;
 
 using Dalamud.Game.Addon.Events;
+using Dalamud.Game.Addon.Events.EventDataTypes;
 using Dalamud.Game.Addon.Lifecycle;
 using Dalamud.Game.Addon.Lifecycle.AddonArgTypes;
+using Dalamud.Plugin.Services;
 
 using FFXIVClientStructs.FFXIV.Client.Game.UI;
 using FFXIVClientStructs.FFXIV.Client.UI;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 
 using Lumina.Excel.Sheets;
+
+using static FFXIVClientStructs.FFXIV.Component.GUI.AtkEventData;
 
 namespace WTSync;
 
@@ -28,9 +32,12 @@ internal class ClickableDuties : IDisposable {
 		Service.AddonLifecycle.RegisterListener(AddonEvent.PostSetup, "WeeklyBingo", OnPostSetup);
 
 		if (Config.ClickableDuties) {
-			var addon = (AddonWeeklyBingo*) Service.GameGui.GetAddonByName("WeeklyBingo");
-			if (addon is not null && addon->IsReady)
-				SetupEvents(addon);
+			var addon = Service.GameGui.GetAddonByName("WeeklyBingo");
+			if (!addon.IsNull || addon.IsReady) {
+				var cast = (AddonWeeklyBingo*) addon.Address;
+				if (cast is not null)
+					SetupEvents(cast);
+			}
 		}
 	}
 
@@ -39,9 +46,12 @@ internal class ClickableDuties : IDisposable {
 			RemoveEvents();
 
 		} else if (EventHandles is null) {
-			var addon = (AddonWeeklyBingo*) Service.GameGui.GetAddonByName("WeeklyBingo");
-			if (addon is not null && addon->IsReady)
-				SetupEvents(addon);
+			var addon = Service.GameGui.GetAddonByName("WeeklyBingo");
+			if (!addon.IsNull || addon.IsReady) {
+				var cast = (AddonWeeklyBingo*) addon.Address;
+				if (cast is not null)
+					SetupEvents(cast);
+			}
 		}
 	}
 
@@ -82,16 +92,20 @@ internal class ClickableDuties : IDisposable {
 	private unsafe void OnPostSetup(AddonEvent type, AddonArgs args) {
 		LastClicked = -1;
 		if (Config.ClickableDuties)
-			SetupEvents((AddonWeeklyBingo*) args.Addon);
+			SetupEvents((AddonWeeklyBingo*) args.Addon.Address);
 	}
 
-	private unsafe void OnClickDutySlot(AddonEventType atkEventType, nint atkUnitBase, nint atkResNode) {
-		var node = (AtkResNode*) atkResNode;
+	private unsafe void OnClickDutySlot(AddonEventType eventType, AddonEventData eventData) {
 		var inst = PlayerState.Instance();
-		if (inst is null)
+
+		// Don't handle right clicks.
+		var atkEventData = (AtkEventData*) eventData.AtkEventDataPointer;
+		var mouseData = atkEventData->MouseData;
+		if (mouseData.ButtonId != 0)
 			return;
 
 		// The node IDs for the duty buttons start with 12.
+		var node = (AtkResNode*) eventData.NodeTargetPointer;
 		int idx = (int) node->NodeId - 12;
 		if (idx < 0 || idx >= 16)
 			return;

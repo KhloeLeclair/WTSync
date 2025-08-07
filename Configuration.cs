@@ -70,6 +70,9 @@ public class Configuration : IPluginConfiguration {
 
 	public Vector4 ColorLevelLabel { get; set; } = ImGuiColors.ParsedBlue;
 
+	// Share Name Overrides
+	public Dictionary<string, string> ShareNicknames { get; set; } = [];
+
 	// Sorting
 
 	public int LastSort { get; set; } = -1;

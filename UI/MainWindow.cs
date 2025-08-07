@@ -17,7 +17,7 @@ using Dalamud.Interface.Windowing;
 using FFXIVClientStructs.FFXIV.Client.Game.UI;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 
-using ImGuiNET;
+using Dalamud.Bindings.ImGui;
 
 using WTSync.Models;
 
@@ -90,12 +90,12 @@ internal class MainWindow : Window, IDisposable {
 		Service.AddonLifecycle.UnregisterListener(AddonEvent.PreFinalize, "WeeklyBingo", OnPreFinalize);
 	}
 
-	internal unsafe void MaybeOpenAtLoad() {
+	internal void MaybeOpenAtLoad() {
 		if (!Config.OpenWithWT || !Config.AcceptedTerms)
 			return;
 
-		var addon = (AtkUnitBase*) Service.GameGui.GetAddonByName("WeeklyBingo", 1);
-		if (addon is null || !addon->IsVisible)
+		var addon = Service.GameGui.GetAddonByName("WeeklyBingo", 1);
+		if (addon.IsNull || ! addon.IsVisible)
 			return;
 
 		IsOpen = true;
@@ -109,23 +109,23 @@ internal class MainWindow : Window, IDisposable {
 			IsOpen = true;
 	}
 
-	private unsafe void OnPreDraw(AddonEvent type, AddonArgs args) {
+	private void OnPreDraw(AddonEvent type, AddonArgs args) {
 		int side = Config.AttachToWT;
 		if (side == 0 || !IsOpen || ImGui.IsAnyMouseDown())
 			return;
 
-		var addon = (AtkUnitBase*) args.Addon;
-		if (addon is null || !addon->IsVisible)
+		var addon = args.Addon;
+		if (addon.IsNull || ! addon.IsVisible)
 			return;
 
-		float x = addon->X;
+		float x = addon.X;
 
 		if (side == 1)
-			x += addon->GetScaledWidth(true) - (addon->Scale * 100);
+			x += addon.ScaledWidth - (addon.Scale * 100);
 		else if (LastSize.HasValue)
-			x -= LastSize.Value.X - (addon->Scale * 40);
+			x -= LastSize.Value.X - (addon.Scale * 40);
 
-		Position = new(x, addon->Y);
+		Position = new(x, addon.Y);
 		PositionCondition = ImGuiCond.Always;
 
 		// TODO: Check how many stickers the player has and send an update.
@@ -139,10 +139,9 @@ internal class MainWindow : Window, IDisposable {
 	}
 
 
-	public unsafe void UpdateFlags() {
-
-		var addon = (AtkUnitBase*) Service.GameGui.GetAddonByName("WeeklyBingo", 1);
-		bool isWTOpen = addon is not null && addon->IsVisible;
+	public void UpdateFlags() {
+		var addon = Service.GameGui.GetAddonByName("WeeklyBingo", 1);
+		bool isWTOpen = !addon.IsNull && addon.IsVisible;
 
 		if (!isWTOpen) {
 			ShowCloseButton = true;
@@ -455,7 +454,12 @@ internal class MainWindow : Window, IDisposable {
 
 				string url = sr.Url ?? string.Empty;
 				if (!string.IsNullOrWhiteSpace(url)) {
-					ImGui.InputText(Localization.Localize("gui.url", "URL"), ref url, (uint) url.Length, ImGuiInputTextFlags.AutoSelectAll | ImGuiInputTextFlags.ReadOnly);
+					ImGui.InputText(
+						Localization.Localize("gui.url", "URL"),
+						ref url,
+						maxLength: url.Length,
+						ImGuiInputTextFlags.AutoSelectAll | ImGuiInputTextFlags.ReadOnly
+					);
 					ImGui.SameLine();
 					ImGui.PushID("copy-to-clipboard#url");
 					if (ImGuiComponents.IconButton(FontAwesomeIcon.Clipboard)) {
@@ -472,7 +476,7 @@ internal class MainWindow : Window, IDisposable {
 					ImGui.PopID();
 
 					if (ImGui.Button(Localization.Localize("gui.open-browser", "Open in Browser")))
-						Helpers.TryOpenURL(url);
+						Dalamud.Utility.Util.OpenLink(url);
 				}
 			}
 
@@ -588,7 +592,7 @@ internal class MainWindow : Window, IDisposable {
 			// Right-click behavior: toggle entry exclusively
 
 			var img = Service.TextureProvider.GetFromGameIcon(new() { IconId = type.IconDutyFinder, HiRes = true }).GetWrapOrEmpty();
-			if (ImGui.ImageButton(img.ImGuiHandle, new Vector2(img.Width, img.Height))) {
+			if (ImGui.ImageButton(img.Handle, new Vector2(img.Width, img.Height))) {
 				PartyState.TypeFilters[type.RowId] = !state;
 				PartyState.UpdateFilters();
 			}
@@ -790,7 +794,7 @@ internal class MainWindow : Window, IDisposable {
 				height = (int) (imgWrap.Height * Plugin.Config.ImageScale);
 
 				if (width > 0 && height > 0) {
-					ImGui.Image(imgWrap.ImGuiHandle, new Vector2(width, height));
+					ImGui.Image(imgWrap.Handle, new Vector2(width, height));
 
 					// Behavior: If the user clicks / right-clicks the image, we should
 					// open the Duty Finder for them.
