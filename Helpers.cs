@@ -224,10 +224,12 @@ internal static class Helpers {
 
 			case 2:
 				// Dungeons (preceeding levels)
+				max = entry.Data.RowId;
+				min = entry.Unknown2;
 				min = entry.Data.RowId - 8;
-				max = entry.Data.RowId - 0;
-				if (max == 49)
-					min = 1;
+				//max = entry.Data.RowId - 0;
+				//if (max == 49)
+				//	min = 1;
 
 				foreach (var dungeon in Dungeons) {
 					uint lvl = dungeon.ClassJobLevelRequired;
@@ -293,12 +295,7 @@ internal static class Helpers {
 			case 5:
 				// Leveling Dungeons (preceeding levels)
 				max = entry.Data.RowId;
-				min = max switch {
-					49 => 1, // Lv. 1-49
-					79 => 51, // Lv. 51-79
-					99 => 81, // Lv. 81-99,
-					_ => max // Unknown
-				};
+				min = entry.Unknown2;
 
 				foreach (var dungeon in Dungeons) {
 					uint lvl = dungeon.ClassJobLevelRequired;
@@ -311,12 +308,7 @@ internal static class Helpers {
 			case 6:
 				// High-Level Dungeons
 				max = entry.Data.RowId;
-				min = max switch {
-					60 => 50, // Lv. 50-60
-					80 => 70, // Lv. 70-80
-					90 => 90, // Lv. 90
-					_ => max, // Unknown
-				};
+				min = entry.Unknown2;
 
 				foreach (var dungeon in Dungeons) {
 					uint lvl = dungeon.ClassJobLevelRequired;
@@ -329,11 +321,7 @@ internal static class Helpers {
 			case 7:
 				// Trials
 				max = entry.Data.RowId;
-				min = max switch {
-					60 => 50,  // Lv. 50-60
-					100 => 70, // Lv. 70-100
-					_ => max,  // Unknown
-				};
+				min = entry.Unknown2;
 
 				foreach (var trial in Trials) {
 					uint lvl = trial.ClassJobLevelRequired;
@@ -346,11 +334,7 @@ internal static class Helpers {
 			case 8:
 				// Alliances
 				max = entry.Data.RowId;
-				min = max switch {
-					60 => 50, // Lv. 50-60
-					90 => 70, // Lv. 70-90
-					_ => max, // Unknown
-				};
+				min = entry.Unknown2;
 
 				foreach (var alliance in Alliances) {
 					uint lvl = alliance.ClassJobLevelRequired;
@@ -363,11 +347,7 @@ internal static class Helpers {
 			case 9:
 				// Raids
 				max = entry.Data.RowId;
-				min = max switch {
-					60 => 50, // Lv. 50-60
-					100 => 70, // Lv. 70-100,
-					_ => max, // Unknown
-				};
+				min = entry.Unknown2;
 
 				foreach (var raid in Raids) {
 					uint lvl = raid.ClassJobLevelRequired;

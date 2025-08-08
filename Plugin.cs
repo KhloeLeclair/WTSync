@@ -459,8 +459,8 @@ public sealed class Plugin : IDalamudPlugin {
 		WindowSystem.Draw();
 	}
 
-	public void ToggleMain(AddonMouseEventData eventData) {
-		if (!eventData.IsLeftClick)
+	public void ToggleMain(DtrInteractionEvent evt) {
+		if (evt.ClickType != MouseClickType.Left)
 			return;
 
 		if (MainWindow.IsOpen) {
