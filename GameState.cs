@@ -2,11 +2,13 @@ using System;
 using System.Collections.Generic;
 
 using Dalamud.Game.ClientState.Conditions;
+using Dalamud.Game.ClientState.Objects.SubKinds;
 
 using FFXIVClientStructs.FFXIV.Client.Game;
 using FFXIVClientStructs.FFXIV.Client.Game.UI;
 using FFXIVClientStructs.FFXIV.Client.UI.Agent;
 using FFXIVClientStructs.FFXIV.Client.UI.Info;
+using FFXIVClientStructs.FFXIV.Client.Game.Character;
 
 using Lumina.Excel.Sheets;
 
@@ -33,21 +35,38 @@ internal static class GameState {
 		}
 	}
 
+	private static IPlayerCharacter? GetLocalPlayer() {
+		if (Service.ObjectTable.Length == 0) return null;
+		return Service.ObjectTable[0] as IPlayerCharacter;
+	}
+
+	private static unsafe ulong GetContentId(IPlayerCharacter? player) {
+		if (player == null) return 0;
+		try {
+			var chara = (Character*)player.Address;
+			return chara->ContentId;
+		} catch {
+			return 0;
+		}
+	}
+
 	internal static bool IsDead {
 		get {
-			if (!Service.ClientState.IsLoggedIn || Service.ClientState.LocalPlayer == null)
+			var player = GetLocalPlayer();
+			if (!Service.ClientState.IsLoggedIn || player == null)
 				return false;
 
-			return Service.ClientState.LocalPlayer.IsDead || Service.Condition.Any(ConditionFlag.Unconscious);
+			return player.IsDead || Service.Condition.Any(ConditionFlag.Unconscious);
 		}
 	}
 
 	internal static bool IsCasting {
 		get {
-			if (!Service.ClientState.IsLoggedIn || Service.ClientState.LocalPlayer == null)
+			var player = GetLocalPlayer();
+			if (!Service.ClientState.IsLoggedIn || player == null)
 				return false;
 
-			return Service.ClientState.LocalPlayer.IsCasting || Service.Condition.Any(
+			return player.IsCasting || Service.Condition.Any(
 				ConditionFlag.Casting,
 				ConditionFlag.Casting87
 			);
@@ -95,9 +114,10 @@ internal static class GameState {
 
 	internal static string? LocalPlayerId {
 		get {
-			if (_LocalContentId != Service.ClientState.LocalContentId || _LocalPlayerId == null) {
-				_LocalContentId = Service.ClientState.LocalContentId;
-				var player = Service.ClientState.LocalPlayer;
+			var player = GetLocalPlayer();
+			ulong currentContentId = GetContentId(player);
+			if (_LocalContentId != currentContentId || _LocalPlayerId == null) {
+				_LocalContentId = currentContentId;
 				if (player == null)
 					_LocalPlayerId = null;
 				else
@@ -109,8 +129,10 @@ internal static class GameState {
 	}
 
 	internal static PartyMember? ReadLocalPlayer() {
-		if (Service.ClientState.IsLoggedIn && Service.ClientState.LocalPlayer != null && Service.ClientState.LocalContentId > 0 && GameState.LocalPlayerId is string lpid)
-			return new(Service.ClientState.LocalPlayer.Name.ToString(), lpid);
+		var player = GetLocalPlayer();
+		ulong currentContentId = GetContentId(player);
+		if (Service.ClientState.IsLoggedIn && player != null && currentContentId > 0 && GameState.LocalPlayerId is { } lpid)
+			return new(player.Name.ToString(), lpid);
 		return null;
 	}
 
@@ -149,12 +171,12 @@ internal static class GameState {
 			if (!group->IsAlliance && !group->IsSmallGroupAlliance)
 				for (int i = 0; i < group->MemberCount; i++) {
 					var member = group->PartyMembers[i];
-					if (member.ContentId > 0 && member.ToId() is string mid)
+					if (member.ContentId > 0 && member.ToId() is { } mid)
 						result.Add(new(member.NameString, mid));
 				}
 		}
 
-		if (result.Count == 0 && ReadLocalPlayer() is PartyMember pm)
+		if (result.Count == 0 && ReadLocalPlayer() is { } pm)
 			result.Add(pm);
 
 		return result;
@@ -169,7 +191,7 @@ internal static class GameState {
 
 		// Sanity checking.
 		byte idx = inst->LocalPlayerGroupIndex;
-		if (idx < 0 || idx >= inst->GroupCount)
+		if (idx >= inst->GroupCount)
 			return null;
 
 		var group = inst->CrossRealmGroups[idx];
@@ -179,13 +201,13 @@ internal static class GameState {
 	private static unsafe List<PartyMember>? ReadCWParty() {
 		var inst = InfoProxyCrossRealm.Instance();
 		// If we aren't in a cross-world party, or if we're in an alliance, then
-		// return null. This will force a fall-back 
+		// return null. This will force a fall-back
 		if (inst is null || inst->IsInAllianceRaid || ! inst->IsInCrossRealmParty)
 			return null;
 
 		// Sanity checking.
 		byte idx = inst->LocalPlayerGroupIndex;
-		if (idx < 0 || idx >= inst->GroupCount)
+		if (idx >= inst->GroupCount)
 			return null;
 
 		List<PartyMember> result = [];
@@ -193,7 +215,7 @@ internal static class GameState {
 		var group = inst->CrossRealmGroups[idx];
 		for (int i = 0; i < group.GroupMemberCount; i++) {
 			var member = group.GroupMembers[i];
-			if (member.ContentId > 0 && member.ToId() is string mid)
+			if (member.ContentId > 0 && member.ToId() is { } mid)
 				result.Add(new(member.NameString, mid));
 		}
 

@@ -40,6 +40,9 @@ internal class Service {
 	internal static INotificationManager NotificationManager { get; private set; } = null!;
 
 	[PluginService]
+	public static IObjectTable ObjectTable { get; private set; } = null!;
+
+	[PluginService]
 	internal static IGameConfig GameConfig { get; private set; } = null!;
 
 	[PluginService]
