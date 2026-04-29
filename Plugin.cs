@@ -451,7 +451,7 @@ public sealed class Plugin : IDalamudPlugin {
 		SendServerUpdate();
 	}
 
-	private void OnTerritoryChanged(ushort territoryId) {
+	private void OnTerritoryChanged(uint territoryId) {
 		SendServerUpdate();
 	}
 

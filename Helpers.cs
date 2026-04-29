@@ -175,7 +175,7 @@ internal static class Helpers {
 		if (sheet == null)
 			return null;
 
-		ushort current = Service.ClientState.TerritoryType;
+		uint current = Service.ClientState.TerritoryType;
 
 		foreach (var duty in status.Duties) {
 			if (!sheet.TryGetRow(duty.Id, out var row))
